@@ -257,7 +257,7 @@ For visual diagram: See `docs/MultiTenantNotificationFlowchartDesign.png` (add v
 ### Quick Start (Docker)
 1. Clone the repo:
    ```
-   git clone <repo-url>
+   git clone https://github.com/EkeHanson/notification_service.git
    cd notification_service
    ```
 

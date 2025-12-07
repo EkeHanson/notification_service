@@ -244,3 +244,47 @@ KAFKA_TOPICS = {
 KAFKA_GROUP_ID = env('KAFKA_GROUP_ID', default='notifications-consumer-group')
 KAFKA_AUTO_OFFSET_RESET = env('KAFKA_AUTO_OFFSET_RESET', default='earliest')
 
+# ======================== Default Notification Credentials ========================
+# These are used as fallbacks when tenants don't have custom credentials configured
+
+DEFAULT_EMAIL_CREDENTIALS = {
+    'smtp_host': env('DEFAULT_SMTP_HOST', default='smtp.gmail.com'),
+    'smtp_port': env.int('DEFAULT_SMTP_PORT', default=587),
+    'username': env('DEFAULT_SMTP_USERNAME', default='test@example.com'),
+    'password': env('DEFAULT_SMTP_PASSWORD', default='test_password'),
+    'from_email': env('DEFAULT_FROM_EMAIL', default='noreply@example.com'),
+    'use_ssl': env.bool('DEFAULT_SMTP_USE_SSL', default=False)
+}
+
+DEFAULT_SMS_CREDENTIALS = {
+    'account_sid': env('DEFAULT_TWILIO_ACCOUNT_SID', default='ACtest1234567890'),
+    'auth_token': env('DEFAULT_TWILIO_AUTH_TOKEN', default='test_auth_token'),
+    'from_number': env('DEFAULT_TWILIO_FROM_NUMBER', default='+1234567890')
+}
+
+DEFAULT_PUSH_CREDENTIALS = {
+    'type': 'service_account',
+    'project_id': env('DEFAULT_FIREBASE_PROJECT_ID', default='test-project'),
+    'private_key_id': env('DEFAULT_FIREBASE_PRIVATE_KEY_ID', default='test_key_id'),
+    'private_key': env('DEFAULT_FIREBASE_PRIVATE_KEY', default='test_private_key'),
+    'client_email': env('DEFAULT_FIREBASE_CLIENT_EMAIL', default='test@test-project.iam.gserviceaccount.com'),
+    'client_id': env('DEFAULT_FIREBASE_CLIENT_ID', default='123456789'),
+    'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
+    'token_uri': 'https://oauth2.googleapis.com/token',
+    'auth_provider_x509_cert_url': 'https://www.googleapis.com/oauth2/v1/certs',
+    'client_x509_cert_url': env('DEFAULT_FIREBASE_CLIENT_X509_CERT_URL', default='https://www.googleapis.com/robot/v1/metadata/x509/test@test-project.iam.gserviceaccount.com')
+}
+
+# Encryption key for sensitive credential fields
+ENCRYPTION_KEY = env('ENCRYPTION_KEY', default='your-32-character-encryption-key-here')
+
+# ======================== Django Email Configuration ========================
+# Global email settings (used by Django's email backend)
+EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+EMAIL_USE_SSL = env.bool('EMAIL_USE_SSL', default=False)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='test@example.com')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='test_password')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@example.com')
+

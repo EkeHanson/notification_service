@@ -1,7 +1,7 @@
 version: '3.9'
 
 services:
-  notifications-service:
+  notifications:
     build:
       context: .
       dockerfile: Dockerfile
@@ -12,29 +12,67 @@ services:
       - "3001:3001"
     environment:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DEBUG=True
+      - DEBUG=${DEBUG}
       - DB_ENGINE=django.db.backends.postgresql
       - NOTIFICATIONS_DB_NAME=notifications_db
-      - DB_USER=postgres
-      - DB_PASSWORD=password
+      - DB_NAME=notifications_db
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=notifications_postgres
-      - DB_PORT=5432
+      - DB_PORT=${DB_PORT}
       - DJANGO_SETTINGS_MODULE=notification_service.settings
       - PYTHONPATH=/app
-      - ALLOWED_HOSTS=localhost,127.0.0.1,*
-      - AUTH_SERVICE_URL=http://auth-service:8001
-      - HR_SERVICE_URL=http://hr-service:8004  # Example integration
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - NOTIFICATIONS_SERVICE_URL=${NOTIFICATIONS_SERVICE_URL}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - HR_SERVICE_URL=${HR_SERVICE_URL}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-      - SUPABASE_BUCKET=luminacaremedia
-      - STORAGE_TYPE=supabase
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SUPABASE_BUCKET=${SUPABASE_BUCKET}
+      - STORAGE_TYPE=${STORAGE_TYPE}
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
       - CELERY_BROKER_URL=redis://notifications_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://notifications_redis:6379/0
       - REDIS_URL=redis://notifications_redis:6379/1
-      - CORS_ALLOWED_ORIGINS=http://localhost:5173,https://crm-frontend-react.vercel.app,http://localhost:8000
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
       - TZ=UTC
       - RUN_MAIN_SERVICE=true
+      - GLOBAL_ADMIN_EMAIL=${GLOBAL_ADMIN_EMAIL}
+      - GLOBAL_ADMIN_USERNAME=${GLOBAL_ADMIN_USERNAME}
+      - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
+      - FERNET_KEYS=${FERNET_KEYS}
+      - QR_ENCRYPTION_KEY=${QR_ENCRYPTION_KEY}
+      - GATEWAY_URL=${GATEWAY_URL}
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+      - POSTMAN_API_KEY=${POSTMAN_API_KEY}
+      - CACHE_ENABLED=${CACHE_ENABLED}
+      # Email configuration
+      - EMAIL_BACKEND=${EMAIL_BACKEND}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+      # Default notification credentials
+      - DEFAULT_SMTP_HOST=${DEFAULT_SMTP_HOST}
+      - DEFAULT_SMTP_PORT=${DEFAULT_SMTP_PORT}
+      - DEFAULT_SMTP_USERNAME=${DEFAULT_SMTP_USERNAME}
+      - DEFAULT_SMTP_PASSWORD=${DEFAULT_SMTP_PASSWORD}
+      - DEFAULT_SMTP_USE_SSL=${DEFAULT_SMTP_USE_SSL}
+      # SMS defaults
+      - DEFAULT_TWILIO_ACCOUNT_SID=${DEFAULT_TWILIO_ACCOUNT_SID}
+      - DEFAULT_TWILIO_AUTH_TOKEN=${DEFAULT_TWILIO_AUTH_TOKEN}
+      - DEFAULT_TWILIO_FROM_NUMBER=${DEFAULT_TWILIO_FROM_NUMBER}
+      # Push defaults
+      - DEFAULT_FIREBASE_PROJECT_ID=${DEFAULT_FIREBASE_PROJECT_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY_ID=${DEFAULT_FIREBASE_PRIVATE_KEY_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY=${DEFAULT_FIREBASE_PRIVATE_KEY}
+      - DEFAULT_FIREBASE_CLIENT_EMAIL=${DEFAULT_FIREBASE_CLIENT_EMAIL}
+      - DEFAULT_FIREBASE_CLIENT_ID=${DEFAULT_FIREBASE_CLIENT_ID}
+      - DEFAULT_FIREBASE_CLIENT_X509_CERT_URL=${DEFAULT_FIREBASE_CLIENT_X509_CERT_URL}
+      # Encryption
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     volumes:
       - .:/app
       - ./notifications_logs:/app/notifications_logs
@@ -66,30 +104,82 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: notifications-celery-worker
     environment:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DEBUG=${DEBUG}
       - DJANGO_SETTINGS_MODULE=notification_service.settings
       - DB_ENGINE=django.db.backends.postgresql
       - NOTIFICATIONS_DB_NAME=notifications_db
-      - DB_USER=postgres
-      - DB_PASSWORD=password
+      - DB_NAME=notifications_db
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=notifications_postgres
-      - DB_PORT=5432
+      - DB_PORT=${DB_PORT}
       - CELERY_BROKER_URL=redis://notifications_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://notifications_redis:6379/0
       - REDIS_URL=redis://notifications_redis:6379/1
       - TZ=UTC
+      - GLOBAL_ADMIN_EMAIL=${GLOBAL_ADMIN_EMAIL}
+      - GLOBAL_ADMIN_USERNAME=${GLOBAL_ADMIN_USERNAME}
+      - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
+      - FERNET_KEYS=${FERNET_KEYS}
+      - QR_ENCRYPTION_KEY=${QR_ENCRYPTION_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_BUCKET=${SUPABASE_BUCKET}
+      - STORAGE_TYPE=${STORAGE_TYPE}
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - NOTIFICATIONS_SERVICE_URL=${NOTIFICATIONS_SERVICE_URL}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - HR_SERVICE_URL=${HR_SERVICE_URL}
+      - GATEWAY_URL=${GATEWAY_URL}
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+      - POSTMAN_API_KEY=${POSTMAN_API_KEY}
+      - CACHE_ENABLED=${CACHE_ENABLED}
+      # Email configuration
+      - EMAIL_BACKEND=${EMAIL_BACKEND}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+      # Default notification credentials
+      - DEFAULT_SMTP_HOST=${DEFAULT_SMTP_HOST}
+      - DEFAULT_SMTP_PORT=${DEFAULT_SMTP_PORT}
+      - DEFAULT_SMTP_USERNAME=${DEFAULT_SMTP_USERNAME}
+      - DEFAULT_SMTP_PASSWORD=${DEFAULT_SMTP_PASSWORD}
+      - DEFAULT_SMTP_USE_SSL=${DEFAULT_SMTP_USE_SSL}
+      # SMS defaults
+      - DEFAULT_TWILIO_ACCOUNT_SID=${DEFAULT_TWILIO_ACCOUNT_SID}
+      - DEFAULT_TWILIO_AUTH_TOKEN=${DEFAULT_TWILIO_AUTH_TOKEN}
+      - DEFAULT_TWILIO_FROM_NUMBER=${DEFAULT_TWILIO_FROM_NUMBER}
+      # Push defaults
+      - DEFAULT_FIREBASE_PROJECT_ID=${DEFAULT_FIREBASE_PROJECT_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY_ID=${DEFAULT_FIREBASE_PRIVATE_KEY_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY=${DEFAULT_FIREBASE_PRIVATE_KEY}
+      - DEFAULT_FIREBASE_CLIENT_EMAIL=${DEFAULT_FIREBASE_CLIENT_EMAIL}
+      - DEFAULT_FIREBASE_CLIENT_ID=${DEFAULT_FIREBASE_CLIENT_ID}
+      - DEFAULT_FIREBASE_CLIENT_X509_CERT_URL=${DEFAULT_FIREBASE_CLIENT_X509_CERT_URL}
+      # Encryption
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     volumes:
       - .:/app
       - ./notifications_logs:/app/notifications_logs
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
     command: >
       bash -c "
       /app/wait-for-it.sh notifications_postgres:5432 -t 60 &&
       celery -A notification_service worker --loglevel=info
       "
     depends_on:
-      - notifications-service
+      - notifications
     networks:
       - auth_service_default
     restart: unless-stopped
@@ -105,35 +195,87 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: notifications-celery-beat
     environment:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DEBUG=${DEBUG}
       - DJANGO_SETTINGS_MODULE=notification_service.settings
       - DB_ENGINE=django.db.backends.postgresql
       - NOTIFICATIONS_DB_NAME=notifications_db
-      - DB_USER=postgres
-      - DB_PASSWORD=password
+      - DB_NAME=notifications_db
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=notifications_postgres
-      - DB_PORT=5432
+      - DB_PORT=${DB_PORT}
       - CELERY_BROKER_URL=redis://notifications_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://notifications_redis:6379/0
       - TZ=UTC
+      - GLOBAL_ADMIN_EMAIL=${GLOBAL_ADMIN_EMAIL}
+      - GLOBAL_ADMIN_USERNAME=${GLOBAL_ADMIN_USERNAME}
+      - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
+      - FERNET_KEYS=${FERNET_KEYS}
+      - QR_ENCRYPTION_KEY=${QR_ENCRYPTION_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_BUCKET=${SUPABASE_BUCKET}
+      - STORAGE_TYPE=${STORAGE_TYPE}
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - NOTIFICATIONS_SERVICE_URL=${NOTIFICATIONS_SERVICE_URL}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - HR_SERVICE_URL=${HR_SERVICE_URL}
+      - GATEWAY_URL=${GATEWAY_URL}
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+      - POSTMAN_API_KEY=${POSTMAN_API_KEY}
+      - CACHE_ENABLED=${CACHE_ENABLED}
+      # Email configuration
+      - EMAIL_BACKEND=${EMAIL_BACKEND}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+      # Default notification credentials
+      - DEFAULT_SMTP_HOST=${DEFAULT_SMTP_HOST}
+      - DEFAULT_SMTP_PORT=${DEFAULT_SMTP_PORT}
+      - DEFAULT_SMTP_USERNAME=${DEFAULT_SMTP_USERNAME}
+      - DEFAULT_SMTP_PASSWORD=${DEFAULT_SMTP_PASSWORD}
+      - DEFAULT_SMTP_USE_SSL=${DEFAULT_SMTP_USE_SSL}
+      # SMS defaults
+      - DEFAULT_TWILIO_ACCOUNT_SID=${DEFAULT_TWILIO_ACCOUNT_SID}
+      - DEFAULT_TWILIO_AUTH_TOKEN=${DEFAULT_TWILIO_AUTH_TOKEN}
+      - DEFAULT_TWILIO_FROM_NUMBER=${DEFAULT_TWILIO_FROM_NUMBER}
+      # Push defaults
+      - DEFAULT_FIREBASE_PROJECT_ID=${DEFAULT_FIREBASE_PROJECT_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY_ID=${DEFAULT_FIREBASE_PRIVATE_KEY_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY=${DEFAULT_FIREBASE_PRIVATE_KEY}
+      - DEFAULT_FIREBASE_CLIENT_EMAIL=${DEFAULT_FIREBASE_CLIENT_EMAIL}
+      - DEFAULT_FIREBASE_CLIENT_ID=${DEFAULT_FIREBASE_CLIENT_ID}
+      - DEFAULT_FIREBASE_CLIENT_X509_CERT_URL=${DEFAULT_FIREBASE_CLIENT_X509_CERT_URL}
+      # Encryption
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     volumes:
       - .:/app
       - ./notifications_logs:/app/notifications_logs
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
     command: >
       bash -c "
       /app/wait-for-it.sh notifications_postgres:5432 -t 60 &&
       celery -A notification_service beat --loglevel=info
       "
     depends_on:
-      - notifications-service
+      - notifications
     networks:
       - auth_service_default
     restart: unless-stopped
     mem_limit: 2g
     healthcheck:
-      test: ["CMD-SHELL", "celery -A notification_service beat --loglevel=info"]
+      test: ["CMD-SHELL", "celery -A notification_service inspect ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -143,32 +285,84 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: notifications-flower
     ports:
-      - "5556:5555"  # Different port from HR
+      - "5556:5555"
     environment:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DEBUG=${DEBUG}
       - DJANGO_SETTINGS_MODULE=notification_service.settings
       - DB_ENGINE=django.db.backends.postgresql
       - NOTIFICATIONS_DB_NAME=notifications_db
-      - DB_USER=postgres
-      - DB_PASSWORD=password
+      - DB_NAME=notifications_db
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=notifications_postgres
-      - DB_PORT=5432
+      - DB_PORT=${DB_PORT}
       - CELERY_BROKER_URL=redis://notifications_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://notifications_redis:6379/0
       - REDIS_URL=redis://notifications_redis:6379/1
       - TZ=UTC
+      - GLOBAL_ADMIN_EMAIL=${GLOBAL_ADMIN_EMAIL}
+      - GLOBAL_ADMIN_USERNAME=${GLOBAL_ADMIN_USERNAME}
+      - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
+      - FERNET_KEYS=${FERNET_KEYS}
+      - QR_ENCRYPTION_KEY=${QR_ENCRYPTION_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_BUCKET=${SUPABASE_BUCKET}
+      - STORAGE_TYPE=${STORAGE_TYPE}
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - NOTIFICATIONS_SERVICE_URL=${NOTIFICATIONS_SERVICE_URL}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - HR_SERVICE_URL=${HR_SERVICE_URL}
+      - GATEWAY_URL=${GATEWAY_URL}
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+      - POSTMAN_API_KEY=${POSTMAN_API_KEY}
+      - CACHE_ENABLED=${CACHE_ENABLED}
+      # Email configuration for Celery workers
+      - EMAIL_BACKEND=${EMAIL_BACKEND}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+      # Default notification credentials
+      - DEFAULT_SMTP_HOST=${DEFAULT_SMTP_HOST}
+      - DEFAULT_SMTP_PORT=${DEFAULT_SMTP_PORT}
+      - DEFAULT_SMTP_USERNAME=${DEFAULT_SMTP_USERNAME}
+      - DEFAULT_SMTP_PASSWORD=${DEFAULT_SMTP_PASSWORD}
+      - DEFAULT_SMTP_USE_SSL=${DEFAULT_SMTP_USE_SSL}
+      # SMS defaults
+      - DEFAULT_TWILIO_ACCOUNT_SID=${DEFAULT_TWILIO_ACCOUNT_SID}
+      - DEFAULT_TWILIO_AUTH_TOKEN=${DEFAULT_TWILIO_AUTH_TOKEN}
+      - DEFAULT_TWILIO_FROM_NUMBER=${DEFAULT_TWILIO_FROM_NUMBER}
+      # Push defaults
+      - DEFAULT_FIREBASE_PROJECT_ID=${DEFAULT_FIREBASE_PROJECT_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY_ID=${DEFAULT_FIREBASE_PRIVATE_KEY_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY=${DEFAULT_FIREBASE_PRIVATE_KEY}
+      - DEFAULT_FIREBASE_CLIENT_EMAIL=${DEFAULT_FIREBASE_CLIENT_EMAIL}
+      - DEFAULT_FIREBASE_CLIENT_ID=${DEFAULT_FIREBASE_CLIENT_ID}
+      - DEFAULT_FIREBASE_CLIENT_X509_CERT_URL=${DEFAULT_FIREBASE_CLIENT_X509_CERT_URL}
+      # Encryption
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     volumes:
       - .:/app
       - ./notifications_logs:/app/notifications_logs
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
     command: >
       bash -c "
       /app/wait-for-it.sh notifications_postgres:5432 -t 60 &&
       celery --broker=redis://notifications_redis:6379/0 flower --port=5555
       "
     depends_on:
-      - notifications-service
+      - notifications
     networks:
       - auth_service_default
     restart: unless-stopped
@@ -184,7 +378,7 @@ services:
     image: redis:7-alpine
     container_name: notifications_redis
     ports:
-      - "6383:6379"  # Different from HR
+      - "6383:6379"
     volumes:
       - notifications_redis_data:/data
     command: redis-server --appendonly yes
@@ -203,12 +397,12 @@ services:
     container_name: notifications_postgres
     environment:
       - POSTGRES_DB=notifications_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
       - TZ=UTC
       - POSTGRES_TIMEOUT=300
     ports:
-      - "5436:5432"  # Different from HR
+      - "5436:5432"
     volumes:
       - notifications_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -221,36 +415,87 @@ services:
     networks:
       - auth_service_default
 
-  # Kafka consumer service (moved to top-level under services)
   kafka-consumer:
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: notifications-kafka-consumer
     environment:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DEBUG=True
+      - DEBUG=${DEBUG}
       - DB_ENGINE=django.db.backends.postgresql
       - NOTIFICATIONS_DB_NAME=notifications_db
-      - DB_USER=postgres
-      - DB_PASSWORD=password
+      - DB_NAME=notifications_db
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=notifications_postgres
-      - DB_PORT=5432
+      - DB_PORT=${DB_PORT}
       - DJANGO_SETTINGS_MODULE=notification_service.settings
       - PYTHONPATH=/app
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
       - TZ=UTC
+      - GLOBAL_ADMIN_EMAIL=${GLOBAL_ADMIN_EMAIL}
+      - GLOBAL_ADMIN_USERNAME=${GLOBAL_ADMIN_USERNAME}
+      - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
+      - FERNET_KEYS=${FERNET_KEYS}
+      - QR_ENCRYPTION_KEY=${QR_ENCRYPTION_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_BUCKET=${SUPABASE_BUCKET}
+      - STORAGE_TYPE=${STORAGE_TYPE}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - NOTIFICATIONS_SERVICE_URL=${NOTIFICATIONS_SERVICE_URL}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - HR_SERVICE_URL=${HR_SERVICE_URL}
+      - GATEWAY_URL=${GATEWAY_URL}
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+      - POSTMAN_API_KEY=${POSTMAN_API_KEY}
+      - CACHE_ENABLED=${CACHE_ENABLED}
+      # Email configuration for Kafka consumer
+      - EMAIL_BACKEND=${EMAIL_BACKEND}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+      # Default notification credentials
+      - DEFAULT_SMTP_HOST=${DEFAULT_SMTP_HOST}
+      - DEFAULT_SMTP_PORT=${DEFAULT_SMTP_PORT}
+      - DEFAULT_SMTP_USERNAME=${DEFAULT_SMTP_USERNAME}
+      - DEFAULT_SMTP_PASSWORD=${DEFAULT_SMTP_PASSWORD}
+      - DEFAULT_SMTP_USE_SSL=${DEFAULT_SMTP_USE_SSL}
+      # SMS defaults
+      - DEFAULT_TWILIO_ACCOUNT_SID=${DEFAULT_TWILIO_ACCOUNT_SID}
+      - DEFAULT_TWILIO_AUTH_TOKEN=${DEFAULT_TWILIO_AUTH_TOKEN}
+      - DEFAULT_TWILIO_FROM_NUMBER=${DEFAULT_TWILIO_FROM_NUMBER}
+      # Push defaults
+      - DEFAULT_FIREBASE_PROJECT_ID=${DEFAULT_FIREBASE_PROJECT_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY_ID=${DEFAULT_FIREBASE_PRIVATE_KEY_ID}
+      - DEFAULT_FIREBASE_PRIVATE_KEY=${DEFAULT_FIREBASE_PRIVATE_KEY}
+      - DEFAULT_FIREBASE_CLIENT_EMAIL=${DEFAULT_FIREBASE_CLIENT_EMAIL}
+      - DEFAULT_FIREBASE_CLIENT_ID=${DEFAULT_FIREBASE_CLIENT_ID}
+      - DEFAULT_FIREBASE_CLIENT_X509_CERT_URL=${DEFAULT_FIREBASE_CLIENT_X509_CERT_URL}
+      # Encryption
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     volumes:
       - .:/app
+      - ./notifications_logs:/app/notifications_logs
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
     command: >
       bash -c "
       /app/wait-for-it.sh notifications_postgres:5432 -t 60 &&
       python -m notifications.consumers
       "
     depends_on:
-      - notifications-service
+      - notifications
     networks:
       - auth_service_default
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep python"]
       interval: 30s
