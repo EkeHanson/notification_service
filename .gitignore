@@ -1,0 +1,150 @@
+# .gitignore for notification_service
+# Generated to cover common Python, Django, Celery, Docker, Kafka, and editor artifacts
+
+########################################
+# Python / Django
+########################################
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+*.egg-info/
+*.egg
+*.whl
+dist/
+build/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+/.env
+.env.*
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage
+.pytest_cache/
+.cache/
+.coverage
+coverage.xml
+htmlcov/
+nosetests.xml
+junit-*.xml
+
+# Django stuff:
+*.log
+logs/
+staticfiles/
+media/
+local_settings.py
+settings_local.py
+secrets.json
+
+# Database
+*.sqlite3
+*.db
+
+# Migrations (keep migrations in repo) - ignore compiled Python cache only
+*/migrations/__pycache__/
+
+########################################
+# Celery
+########################################
+celerybeat-schedule
+celerybeat.pid
+celerybeat-schedule.*
+
+########################################
+# Docker
+########################################
+# Ignore images, volumes, and env files
+*.env
+docker-compose.override.yml
+docker-compose.*.yml
+**/Dockerfile*~
+
+# Docker build artifacts
+**/tmp/
+
+########################################
+# Kafka / Messaging / Broker
+########################################
+# Local kafka logs/consumer offsets (if present)
+kafka-logs/
+*.offset
+
+########################################
+# IDEs / Editors
+########################################
+# VSCode
+.vscode/
+# JetBrains
+.idea/
+*.iml
+# Sublime
+*.sublime-project
+*.sublime-workspace
+
+########################################
+# OS files
+########################################
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+########################################
+# Node / frontend (if any)
+########################################
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+########################################
+# Build / artifacts
+########################################
+*.pyc
+*.pyo
+*.pyd
+*.class
+
+########################################
+# Secrets / keys
+########################################
+# Encryption keys, service account json, private keys
+*.pem
+*.key
+*.crt
+*.p12
+service-account-*.json
+*-credentials.json
+
+########################################
+# Test artifacts / reports
+########################################
+test-reports/
+TEST-*.xml
+
+# Misc
+.coverage.*
+coverage_html_report/
+
+# Allow listing important repo files (remove if you want to ignore more)
+# Keep README, docs, migrations, and tests tracked
