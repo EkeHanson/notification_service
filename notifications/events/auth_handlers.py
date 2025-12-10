@@ -245,12 +245,15 @@ class LoginSecurityHandler(BaseEventHandler):
     def _get_inapp_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
         if event_type == 'user.login.succeeded':
             return {
-                'title': '🔐 New Login Detected',
-                'body': 'A new login was detected on your account from {{location}}',
+                'title': '🔐 Account Access Notification',
+                'body': 'Your account was accessed from {{ip_address}} at {{timestamp}}. If this wasn\'t you, please secure your account immediately.',
                 'data': {
-                    'type': 'login_success',
-                    'action': 'view_activity',
-                    'priority': 'normal'
+                    'type': 'account_access',
+                    'action': 'view_security',
+                    'priority': 'high',
+                    'ip_address': context.get('ip_address'),
+                    'user_agent': context.get('user_agent'),
+                    'login_method': context.get('login_method')
                 }
             }
         elif event_type == 'user.login.failed':

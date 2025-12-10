@@ -5,7 +5,7 @@ import {
   ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchInAppMessages, markMessageAsRead } from './Employees/config/apiService';
+import { fetchInAppMessages, markMessageAsRead } from './apiService';
 import { WEBSOCKET_URL } from '../../config';
 
 

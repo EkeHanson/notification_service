@@ -13,6 +13,8 @@ from django.conf import settings
 import asyncio
 import logging
 import json
+import smtplib
+import socket
 
 logger = logging.getLogger('notifications.tasks')
 
@@ -71,6 +73,41 @@ def send_notification_task(self, record_id: str, channel: str, recipient: str, c
 
     try:
         creds = validate_tenant_and_channel(record.tenant_id, channel)
+        # DIAGNOSTIC: log masked credentials and attempt a quick SMTP auth check
+        try:
+            _pwd = creds.get('password', '') or ''
+            _pwd_preview = (_pwd[:6] + '...') if len(_pwd) > 6 else _pwd
+            _looks_encrypted = str(_pwd).startswith('gAAAA')
+            logger.info(f"🔍 TASK DIAG - creds summary for tenant {record.tenant_id}: smtp_host={creds.get('smtp_host')}, smtp_port={creds.get('smtp_port')}, username={creds.get('username')}, password_preview={_pwd_preview}, password_len={len(_pwd)}, looks_encrypted={_looks_encrypted}")
+
+            # Quick SMTP auth probe (no message send) to detect auth failure early
+            if creds.get('smtp_host') and creds.get('username'):
+                try:
+                    timeout = 10
+                    if creds.get('use_ssl'):
+                        conn = smtplib.SMTP_SSL(host=creds.get('smtp_host'), port=int(creds.get('smtp_port') or 465), timeout=timeout)
+                    else:
+                        conn = smtplib.SMTP(host=creds.get('smtp_host'), port=int(creds.get('smtp_port') or 587), timeout=timeout)
+                    conn.ehlo()
+                    if creds.get('use_tls') and not creds.get('use_ssl'):
+                        conn.starttls()
+                        conn.ehlo()
+                    # set_debuglevel(0) to avoid verbose output; rely on exceptions
+                    conn.set_debuglevel(0)
+                    try:
+                        conn.login(creds.get('username'), creds.get('password'))
+                        logger.info(f"🔍 TASK DIAG - SMTP auth probe OK for tenant {record.tenant_id}")
+                    except Exception as e:
+                        logger.warning(f"🔍 TASK DIAG - SMTP auth probe FAILED for tenant {record.tenant_id}: {e}")
+                    finally:
+                        try:
+                            conn.quit()
+                        except Exception:
+                            pass
+                except (socket.timeout, socket.error) as e:
+                    logger.warning(f"🔍 TASK DIAG - SMTP connection error for tenant {record.tenant_id}: {e}")
+        except Exception as _diag_e:
+            logger.warning(f"🔍 TASK DIAG - failed to run SMTP diagnostic: {_diag_e}")
         handler = Dispatcher.get_handler(channel, record.tenant_id, creds)
 
         # Use async_to_sync for proper async handling in Celery

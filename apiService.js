@@ -1291,3 +1291,29 @@ export const uploadChatFile = async (file) => {
     throw error;
   }
 };
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Notification API Functions
+// ──────────────────────────────────────────────────────────────────────────────
+
+// Fetch in-app messages
+export const fetchInAppMessages = async (params = {}) => {
+  try {
+    const response = await apiClient.get("/api/notifications/inapp-messages/", { params });
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+    throw error;
+  }
+};
+
+// Mark message as read
+export const markMessageAsRead = async (messageId) => {
+  try {
+    const response = await apiClient.post(`/api/notifications/inapp-messages/${messageId}/mark-read/`);
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+    throw error;
+  }
+};

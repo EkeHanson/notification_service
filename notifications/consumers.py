@@ -54,7 +54,16 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             for group in self.groups_joined:
                 await self.channel_layer.group_discard(group, self.channel_name)
 
-            logger.info(f"WebSocket disconnected for user {self.user_id} in tenant {self.tenant_id}")
+            logger.info(f"WebSocket disconnected for user {self.user_id} in tenant {self.tenant_id} with code {close_code}")
+
+            # Log specific disconnection codes for debugging
+            if close_code == 1006:
+                logger.warning(f"WebSocket abnormal closure (1006) for user {self.user_id} - possible network issue or server restart")
+            elif close_code == 1001:
+                logger.info(f"WebSocket normal closure (1001) for user {self.user_id}")
+            elif close_code == 1000:
+                logger.info(f"WebSocket clean closure (1000) for user {self.user_id}")
+
         except Exception as e:
             logger.error(f"WebSocket disconnection error: {str(e)}")
 
@@ -234,13 +243,18 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 'priority': event.get('priority', 'normal')
             }
 
-            # Send to WebSocket
-            await self.send(text_data=json.dumps(notification_data))
-
-            logger.debug(f"Sent notification to user {self.user_id}: {notification_data['title']}")
+            # Send to WebSocket with error handling
+            try:
+                await self.send(text_data=json.dumps(notification_data))
+                logger.debug(f"Sent notification to user {self.user_id}: {notification_data['title']}")
+            except Exception as send_error:
+                logger.error(f"Failed to send notification to WebSocket for user {self.user_id}: {str(send_error)}")
+                # Could implement retry logic here if needed
+                raise send_error
 
         except Exception as e:
-            logger.error(f"Error sending in-app notification: {str(e)}")
+            logger.error(f"Error processing in-app notification: {str(e)}")
+            # Don't re-raise to prevent channel layer errors from crashing the consumer
 
     async def receive(self, text_data):
         """Handle incoming WebSocket messages"""
@@ -250,10 +264,13 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
             if message_type == 'ping':
                 # Respond to ping with pong
-                await self.send(text_data=json.dumps({
-                    'type': 'pong',
-                    'timestamp': self.get_current_timestamp()
-                }))
+                try:
+                    await self.send(text_data=json.dumps({
+                        'type': 'pong',
+                        'timestamp': self.get_current_timestamp()
+                    }))
+                except Exception as ping_error:
+                    logger.error(f"Failed to send pong response: {str(ping_error)}")
 
             elif message_type == 'mark_read':
                 # Mark notification as read
@@ -272,6 +289,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             logger.error("Invalid JSON received")
         except Exception as e:
             logger.error(f"Error processing received message: {str(e)}")
+            # Don't close connection on message processing errors
 
     @database_sync_to_async
     def mark_notification_read(self, notification_id):

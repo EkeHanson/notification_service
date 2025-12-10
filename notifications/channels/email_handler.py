@@ -11,7 +11,6 @@ class EmailHandler(BaseHandler):
         super().__init__(tenant_id, credentials)
         self.tenant_branding = None
 
-
     def _get_tenant_branding(self, context=None):
         """Get tenant branding information from context or fallback to API"""
         if self.tenant_branding is None:
@@ -216,17 +215,15 @@ class EmailHandler(BaseHandler):
             # Create HTML version
             html_body = self._render_html_template(content, context)
 
-            # Credentials are already decrypted by the validator
+            # Use credentials (already decrypted by validator)
             creds = self.credentials
 
-            # DEBUG: Log the actual credentials being used
-            logger.info(f"🔍 DEBUG - Raw credentials: {creds}")
-            logger.info(f"🔍 DEBUG - SMTP Host: {creds.get('smtp_host')}")
-            logger.info(f"🔍 DEBUG - SMTP Port: {creds.get('smtp_port')}")
-            logger.info(f"🔍 DEBUG - Username: {creds.get('username')}")
-            logger.info(f"🔍 DEBUG - Password length: {len(creds.get('password', ''))}")
-            logger.info(f"🔍 DEBUG - Use SSL: {creds.get('use_ssl')}")
-            logger.info(f"🔍 DEBUG - Use TLS: {creds.get('use_tls')}")
+            # DEBUG: Log a masked credentials summary (do NOT log plaintext passwords)
+            _pwd = creds.get('password', '') or ''
+            _pwd_preview = (_pwd[:6] + '...') if len(_pwd) > 6 else _pwd
+            _looks_encrypted = str(_pwd).startswith('gAAAA')
+            logger.info(f"🔍 DEBUG - Credentials summary - smtp_host={creds.get('smtp_host')}, smtp_port={creds.get('smtp_port')}, username={creds.get('username')}, password_preview={_pwd_preview}, password_len={len(_pwd)}, looks_encrypted={_looks_encrypted}")
+            logger.info(f"🔍 DEBUG - Use SSL: {creds.get('use_ssl')}, Use TLS: {creds.get('use_tls')}")
 
             # Determine from email
             from_email = creds.get('from_email') or branding.get('email_from') or settings.DEFAULT_FROM_EMAIL
@@ -255,7 +252,20 @@ class EmailHandler(BaseHandler):
                 django_settings.EMAIL_HOST = creds.get('smtp_host')
                 django_settings.EMAIL_PORT = creds.get('smtp_port')
                 django_settings.EMAIL_HOST_USER = creds.get('username')
-                django_settings.EMAIL_HOST_PASSWORD = creds.get('password')
+                # If the password looks like a Fernet token (starts with gAAAA), attempt to decrypt as a fallback.
+                _pwd = creds.get('password') or ''
+                if isinstance(_pwd, str) and _pwd.startswith('gAAAA'):
+                    try:
+                        from notifications.utils.encryption import decrypt_data
+                        _decrypted = decrypt_data(_pwd)
+                        django_settings.EMAIL_HOST_PASSWORD = _decrypted
+                        logger.info(f"🔐 EmailHandler - decrypted tenant password fallback (masked): {_decrypted[:6]}...")
+                    except Exception:
+                        # If decrypt fails, keep original and let send fail with clear error
+                        django_settings.EMAIL_HOST_PASSWORD = _pwd
+                        logger.warning("🔐 EmailHandler - password looks encrypted but failed to decrypt locally; proceeding with original value")
+                else:
+                    django_settings.EMAIL_HOST_PASSWORD = _pwd
                 django_settings.EMAIL_USE_SSL = creds.get('use_ssl', False)
                 django_settings.EMAIL_USE_TLS = creds.get('use_tls', False)
 
