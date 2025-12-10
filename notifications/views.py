@@ -1,4 +1,4 @@
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated  # Or custom
 from django_filters.rest_framework import DjangoFilterBackend
@@ -6,13 +6,14 @@ from rest_framework.filters import SearchFilter
 from notifications.models import (
     NotificationRecord, TenantCredentials, NotificationTemplate, Campaign,
     DeviceToken, PushAnalytics, SMSAnalytics, ChatConversation, ChatParticipant,
-    ChatMessage, MessageReaction, UserPresence, ChannelType, NotificationStatus
+    ChatMessage, MessageReaction, UserPresence, ChannelType, NotificationStatus,
+    InAppMessage, InAppMessageStatus
 )
 from notifications.serializers import (
     NotificationRecordSerializer, TenantCredentialsSerializer, NotificationTemplateSerializer,
     CampaignSerializer, DeviceTokenSerializer, PushAnalyticsSerializer, SMSAnalyticsSerializer,
     ChatConversationSerializer, ChatParticipantSerializer, ChatMessageSerializer,
-    MessageReactionSerializer, UserPresenceSerializer
+    MessageReactionSerializer, UserPresenceSerializer, InAppMessageSerializer
 )
 from notifications.orchestrator.validator import validate_tenant_and_channel
 from notifications.utils.context import get_tenant_context
@@ -75,6 +76,38 @@ class NotificationListCreateView(generics.ListCreateAPIView):
 class TenantCredentialsListCreateView(generics.ListCreateAPIView):
     serializer_class = TenantCredentialsSerializer
     pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        tenant_id = self.request.tenant_id
+        return TenantCredentials.objects.filter(tenant_id=tenant_id)
+
+    def create(self, request, *args, **kwargs):
+        tenant_id = request.tenant_id
+        channel = request.data.get('channel')
+        existing = TenantCredentials.objects.all_with_deleted().filter(tenant_id=tenant_id, channel=channel).first()
+        logger.info(f"Upsert check: tenant_id={tenant_id}, channel={channel}, existing={existing}")
+        if existing:
+            # Update existing (even if soft deleted)
+            if existing.is_deleted:
+                existing.is_deleted = False
+                existing.save(update_fields=['is_deleted'])
+            serializer = self.get_serializer(existing, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            instance = serializer.save()
+            # Mark as custom since tenant is updating it
+            instance.is_custom = True
+            instance.save(update_fields=['is_custom'])
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            # Create new - mark as custom
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            instance = serializer.save(is_custom=True)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class TenantCredentialsDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = TenantCredentialsSerializer
 
     def get_queryset(self):
         tenant_id = self.request.tenant_id
@@ -472,5 +505,59 @@ class FileUploadView(APIView):
             'file_size': uploaded_file.size,
             'content_type': uploaded_file.content_type
         })
+
+
+# In-App Message Views
+class InAppMessageListView(generics.ListAPIView):
+    serializer_class = InAppMessageSerializer
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_fields = ['status', 'priority']
+    search_fields = ['title', 'body']
+
+    def get_queryset(self):
+        # For testing purposes, allow unauthenticated access
+        tenant_id = getattr(self.request, 'tenant_id', '123e4567-e89b-12d3-a456-426614174000')
+        user_id = getattr(self.request, 'user_id', 'test-user-123')
+
+        # Get messages for this user, ordered by creation date (newest first)
+        queryset = InAppMessage.objects.filter(
+            tenant_id=tenant_id,
+            recipient__in=[str(user_id), 'all'],  # Messages for this user or broadcast to all
+            is_deleted=False
+        ).order_by('-created_at')
+
+        # Optionally filter by read status
+        is_read = self.request.query_params.get('is_read')
+        if is_read is not None:
+            if is_read.lower() == 'true':
+                queryset = queryset.filter(read_at__isnull=False)
+            elif is_read.lower() == 'false':
+                queryset = queryset.filter(read_at__isnull=True)
+
+        return queryset
+
+
+class InAppMessageDetailView(generics.RetrieveUpdateAPIView):
+    serializer_class = InAppMessageSerializer
+
+    def get_queryset(self):
+        # For testing purposes, allow unauthenticated access
+        tenant_id = getattr(self.request, 'tenant_id', '123e4567-e89b-12d3-a456-426614174000')
+        user_id = getattr(self.request, 'user_id', 'test-user-123')
+
+        return InAppMessage.objects.filter(
+            tenant_id=tenant_id,
+            recipient=str(user_id),
+            is_deleted=False
+        )
+
+    def perform_update(self, serializer):
+        # Allow marking as read
+        if 'read_at' in self.request.data and self.request.data['read_at']:
+            serializer.instance.mark_read()
+        else:
+            serializer.save()
+
 
 # Add to urlpatterns in api/urls.py

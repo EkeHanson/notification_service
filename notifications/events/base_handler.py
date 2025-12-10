@@ -43,16 +43,16 @@ class BaseEventHandler(ABC):
         content_map = {}
 
         if ChannelType.EMAIL in self.get_default_channels(event_type):
-            content_map[ChannelType.EMAIL] = self._get_email_content(event_type, context)
+            content_map[ChannelType.EMAIL.value] = self._get_email_content(event_type, context)
 
         if ChannelType.SMS in self.get_default_channels(event_type):
-            content_map[ChannelType.SMS] = self._get_sms_content(event_type, context)
+            content_map[ChannelType.SMS.value] = self._get_sms_content(event_type, context)
 
         if ChannelType.PUSH in self.get_default_channels(event_type):
-            content_map[ChannelType.PUSH] = self._get_push_content(event_type, context)
+            content_map[ChannelType.PUSH.value] = self._get_push_content(event_type, context)
 
         if ChannelType.INAPP in self.get_default_channels(event_type):
-            content_map[ChannelType.INAPP] = self._get_inapp_content(event_type, context)
+            content_map[ChannelType.INAPP.value] = self._get_inapp_content(event_type, context)
 
         return content_map
 
@@ -96,10 +96,12 @@ class BaseEventHandler(ABC):
                 if content:  # Only create if content is provided
                     notification = NotificationRecord.objects.create(
                         tenant_id=tenant_id,
-                        channel=channel,
+                        channel=channel,  # channel is already a string (enum value)
                         recipient=recipient,
-                        content=content,
-                        context=self.get_template_data(event_payload)
+                        context={
+                            'template_data': self.get_template_data(event_payload),
+                            'content': content
+                        }
                     )
                     notifications.append(notification)
 

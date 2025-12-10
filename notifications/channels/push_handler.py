@@ -225,7 +225,7 @@ class PushHandler(BaseHandler):
             headers={'Urgency': 'high' if content.get('priority') == 'high' else 'normal'}
         )
 
-    async def send(self, recipient: str, content: dict, context: dict) -> dict:
+    async def send(self, recipient: str, content: dict, context: dict, record_id: str = None) -> dict:
         """
         Send push notification to a single recipient
 

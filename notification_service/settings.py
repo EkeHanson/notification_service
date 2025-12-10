@@ -16,12 +16,14 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
-DEBUG = env.bool('DEBUG', default=False)
+DEBUG = env.bool('DEBUG', default=True)
+# Force DEBUG to False to avoid HTML debug pages in logs
+DEBUG = False
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[
     "localhost", "127.0.0.1", "notifications-service", "0.0.0.0", "*", "notifications-service:3001"
 ])
 
-GATEWAY_URL = env("GATEWAY_URL", default="https://server1.prolianceltd.com")
+GATEWAY_URL = env("API_GATEWAY_URL", default="https://server1.prolianceltd.com")
 
 # ======================== Database ========================
 DATABASES = {
@@ -107,6 +109,7 @@ REST_FRAMEWORK = {
 
 # ======================== External Services ========================
 AUTH_SERVICE_URL = env('AUTH_SERVICE_URL', default='http://auth-service:8001')
+API_GATEWAY_URL = env('API_GATEWAY_URL', default='http://api_gateway:9090')  # For auth calls through gateway
 HR_SERVICE_URL = env('HR_SERVICE_URL', default='http://hr-service:8004')  # For integrations
 
 SUPABASE_URL = env('SUPABASE_URL', default='')
@@ -129,7 +132,7 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
 # ======================== CORS ========================
-CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:3000'])
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:3000', 'http://localhost:5173'])
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']
 CORS_ALLOW_HEADERS = ['accept', 'authorization', 'content-type', 'origin', 'x-csrftoken', 'x-requested-with']
@@ -191,12 +194,12 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['file', 'console'],
+            'handlers': ['file'],  # Remove console handler to avoid HTML debug output
             'level': 'INFO',
             'propagate': True,
         },
         'notifications': {
-            'handlers': ['file', 'console'],
+            'handlers': ['file'],  # Remove console handler
             'level': 'INFO',
             'propagate': False,
         },
@@ -237,24 +240,27 @@ django.http.request.split_domain_port = patched_split_domain_port
 
 KAFKA_TOPICS = {
     'notification_events': 'notification-events',
+    'auth_events': 'auth-events',  # Consume from auth service
     'hr_events': 'hr-events',  # Consume from HR
     'tenant': 'tenant-events',
 }
 
 KAFKA_GROUP_ID = env('KAFKA_GROUP_ID', default='notifications-consumer-group')
-KAFKA_AUTO_OFFSET_RESET = env('KAFKA_AUTO_OFFSET_RESET', default='earliest')
+KAFKA_AUTO_OFFSET_RESET = env('KAFKA_AUTO_OFFSET_RESET', default='latest')
 
 # ======================== Default Notification Credentials ========================
 # These are used as fallbacks when tenants don't have custom credentials configured
 
 DEFAULT_EMAIL_CREDENTIALS = {
-    'smtp_host': env('DEFAULT_SMTP_HOST', default='smtp.gmail.com'),
-    'smtp_port': env.int('DEFAULT_SMTP_PORT', default=587),
-    'username': env('DEFAULT_SMTP_USERNAME', default='test@example.com'),
-    'password': env('DEFAULT_SMTP_PASSWORD', default='test_password'),
-    'from_email': env('DEFAULT_FROM_EMAIL', default='noreply@example.com'),
-    'use_ssl': env.bool('DEFAULT_SMTP_USE_SSL', default=False)
+    'smtp_host': 'mailhog',
+    'smtp_port': 1025,
+    'username': '',
+    'password': '',
+    'from_email': 'test@example.com',
+    'use_ssl': False
 }
+
+
 
 DEFAULT_SMS_CREDENTIALS = {
     'account_sid': env('DEFAULT_TWILIO_ACCOUNT_SID', default='ACtest1234567890'),
@@ -280,11 +286,3 @@ ENCRYPTION_KEY = env('ENCRYPTION_KEY', default='your-32-character-encryption-key
 
 # ======================== Django Email Configuration ========================
 # Global email settings (used by Django's email backend)
-EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
-EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = env.int('EMAIL_PORT', default=587)
-EMAIL_USE_SSL = env.bool('EMAIL_USE_SSL', default=False)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='test@example.com')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='test_password')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@example.com')
-

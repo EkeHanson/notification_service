@@ -22,6 +22,12 @@ class NotificationStatus(Enum):
     FAILED = 'failed'
     RETRYING = 'retrying'
 
+class InAppMessageStatus(Enum):
+    PENDING = 'pending'
+    SENT = 'sent'
+    DELIVERED = 'delivered'
+    FAILED = 'failed'
+
 class FailureReason(Enum):
     AUTH_ERROR = 'auth_error'
     NETWORK_ERROR = 'network_error'
@@ -53,6 +59,7 @@ class TenantCredentials(models.Model):
     tenant_id = models.UUIDField(db_index=True)
     channel = models.CharField(max_length=10, choices=[(tag.value, tag.name) for tag in ChannelType])
     credentials = JSONField()  # e.g., {'smtp_host': '...', 'username': '...'} - encrypted separately
+    is_custom = models.BooleanField(default=False)  # True if tenant set these up manually, False if auto-generated defaults
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -115,6 +122,64 @@ class NotificationRecord(models.Model):
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save(update_fields=['is_deleted', 'deleted_at'])
+
+class InAppMessage(models.Model):
+    """Persistent storage for in-app notifications with delivery tracking"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant_id = models.UUIDField(db_index=True)
+    notification_record = models.OneToOneField(NotificationRecord, on_delete=models.CASCADE, related_name='inapp_message')
+    recipient = models.CharField(max_length=500)  # user_id or 'all'
+    message_type = models.CharField(max_length=20, default='inapp_notification')  # inapp_notification, tenant_broadcast, etc.
+    title = models.CharField(max_length=500, blank=True)
+    body = models.TextField(blank=True)
+    data = JSONField(default=dict)  # Additional payload data
+    priority = models.CharField(max_length=10, default='normal', choices=[
+        ('low', 'Low'),
+        ('normal', 'Normal'),
+        ('high', 'High'),
+        ('urgent', 'Urgent')
+    ])
+    status = models.CharField(max_length=10, choices=[(tag.value, tag.name) for tag in InAppMessageStatus], default=InAppMessageStatus.PENDING.value)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)  # For time-sensitive messages
+    retry_count = models.PositiveIntegerField(default=0)
+    max_retries = models.PositiveIntegerField(default=3)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = SoftDeleteManager()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['tenant_id', 'recipient', 'status']),
+            models.Index(fields=['tenant_id', 'status', 'created_at']),
+            models.Index(fields=['recipient', 'status']),
+            models.Index(fields=['expires_at']),
+        ]
+
+    def mark_sent(self):
+        """Mark message as sent"""
+        self.status = InAppMessageStatus.SENT.value
+        self.sent_at = timezone.now()
+        self.save(update_fields=['status', 'sent_at', 'updated_at'])
+
+    def mark_delivered(self):
+        """Mark message as delivered"""
+        self.status = InAppMessageStatus.DELIVERED.value
+        self.delivered_at = timezone.now()
+        self.save(update_fields=['status', 'delivered_at', 'updated_at'])
+
+    def mark_read(self):
+        """Mark message as read"""
+        self.read_at = timezone.now()
+        self.save(update_fields=['read_at', 'updated_at'])
+
+    def __str__(self):
+        return f"InAppMessage {self.id} for {self.recipient} - {self.status}"
 
 class AuditLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -179,6 +244,8 @@ class DeviceToken(models.Model):
     language = models.CharField(max_length=10, default='en')
     timezone = models.CharField(max_length=50, blank=True)
     is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
     last_used = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -239,6 +306,8 @@ class ChatConversation(models.Model):
     created_by = models.UUIDField()  # User who created the conversation
     is_active = models.BooleanField(default=True)
     last_message_at = models.DateTimeField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -269,6 +338,8 @@ class ChatParticipant(models.Model):
     joined_at = models.DateTimeField(auto_now_add=True)
     last_seen_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     objects = SoftDeleteManager()
 
@@ -330,6 +401,8 @@ class MessageReaction(models.Model):
     user_id = models.UUIDField()
     emoji = models.CharField(max_length=10)  # Unicode emoji
     created_at = models.DateTimeField(auto_now_add=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     objects = SoftDeleteManager()
 

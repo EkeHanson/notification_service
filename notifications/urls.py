@@ -1,23 +1,37 @@
 from django.urls import path
+from django.http import JsonResponse
 from .views import (
     AnalyticsView, CampaignListCreateView, NotificationListCreateView,
-    TenantCredentialsListCreateView, NotificationTemplateListCreateView,
+    TenantCredentialsListCreateView, TenantCredentialsDetailView, NotificationTemplateListCreateView,
     DeviceTokenListCreateView, DeviceTokenDetailView, PushAnalyticsListView, PushTestView,
     SMSAnalyticsListView, SMSTestView, SMSStatusView, SMSCostEstimationView,
     ChatConversationListCreateView, ChatConversationDetailView, ChatParticipantListCreateView,
     ChatMessageListCreateView, ChatMessageDetailView, MessageReactionListCreateView,
-    UserPresenceListView, UserPresenceDetailView, FileUploadView
+    UserPresenceListView, UserPresenceDetailView, FileUploadView,
+    InAppMessageListView, InAppMessageDetailView
 )
+
+# Health check endpoint
+def health_check(request):
+    return JsonResponse({"status": "healthy", "service": "notification_service"})
 
 app_name = 'notifications'
 
 urlpatterns = [
+    # Health check endpoint
+    path('health/', health_check, name='health'),
+
     # Core notification endpoints
     path('records/', NotificationListCreateView.as_view(), name='notification-list-create'),
     path('credentials/', TenantCredentialsListCreateView.as_view(), name='credentials-list-create'),
+    path('credentials/<uuid:pk>/', TenantCredentialsDetailView.as_view(), name='credentials-detail'),
     path('templates/', NotificationTemplateListCreateView.as_view(), name='template-list-create'),
     path('analytics/', AnalyticsView.as_view(), name='analytics'),
     path('campaigns/', CampaignListCreateView.as_view(), name='campaign-list-create'),
+
+    # In-App Message endpoints
+    path('messages/', InAppMessageListView.as_view(), name='inapp-message-list'),
+    path('messages/<uuid:pk>/', InAppMessageDetailView.as_view(), name='inapp-message-detail'),
 
     # Device token management for push notifications
     path('devices/', DeviceTokenListCreateView.as_view(), name='device-token-list-create'),

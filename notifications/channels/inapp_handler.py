@@ -5,6 +5,8 @@ from datetime import datetime
 import json
 import logging
 import uuid
+from notifications.models import InAppMessage, InAppMessageStatus
+from django.utils import timezone
 
 logger = logging.getLogger('notifications.channels.inapp')
 
@@ -17,7 +19,7 @@ class InAppHandler(BaseHandler):
         super().__init__(tenant_id, credentials)
         self.notification_id = None
 
-    async def send(self, recipient: str, content: dict, context: dict) -> dict:
+    async def send(self, recipient: str, content: dict, context: dict, record_id: str = None) -> dict:
         """
         Send in-app notification via WebSocket
 
@@ -36,8 +38,33 @@ class InAppHandler(BaseHandler):
             # Render content with context
             rendered_content = self._render_content(content, context)
 
+            # Save message to database for persistence
+            inapp_message = None
+            if record_id:
+                from notifications.models import NotificationRecord
+                try:
+                    record = NotificationRecord.objects.get(id=record_id, tenant_id=self.tenant_id)
+                    inapp_message = InAppMessage.objects.create(
+                        tenant_id=self.tenant_id,
+                        notification_record=record,
+                        recipient=recipient,
+                        title=rendered_content.get('title', ''),
+                        body=rendered_content.get('body', ''),
+                        data=rendered_content.get('data', {}),
+                        priority=rendered_content.get('data', {}).get('priority', 'normal'),
+                        message_type=self._determine_message_type(recipient)[0]
+                    )
+                    logger.debug(f"Saved in-app message {inapp_message.id} for notification {record_id}")
+                except NotificationRecord.DoesNotExist:
+                    logger.warning(f"NotificationRecord {record_id} not found for in-app message")
+                except Exception as e:
+                    logger.error(f"Error saving in-app message: {str(e)}")
+
             channel_layer = get_channel_layer()
             if not channel_layer:
+                if inapp_message:
+                    inapp_message.status = InAppMessageStatus.FAILED.value
+                    inapp_message.save(update_fields=['status'])
                 return {'success': False, 'error': 'Channel layer not configured', 'response': None}
 
             # Determine message type and target groups
@@ -58,6 +85,9 @@ class InAppHandler(BaseHandler):
 
             if sent_groups:
                 logger.info(f"In-app notification sent to {len(sent_groups)} groups for tenant {self.tenant_id}")
+                # Mark message as sent
+                if inapp_message:
+                    inapp_message.mark_sent()
                 return {
                     'success': True,
                     'response': {
@@ -68,10 +98,18 @@ class InAppHandler(BaseHandler):
                     }
                 }
             else:
+                # Mark as failed
+                if inapp_message:
+                    inapp_message.status = InAppMessageStatus.FAILED.value
+                    inapp_message.save(update_fields=['status'])
                 return {'success': False, 'error': 'No groups received the message', 'response': None}
 
         except Exception as e:
             logger.error(f"In-app send error for tenant {self.tenant_id} to {recipient}: {str(e)}")
+            # Mark message as failed
+            if inapp_message:
+                inapp_message.status = InAppMessageStatus.FAILED.value
+                inapp_message.save(update_fields=['status'])
             return {'success': False, 'error': str(e), 'response': None}
 
     def _render_content(self, content: dict, context: dict) -> dict:
@@ -170,7 +208,7 @@ class InAppHandler(BaseHandler):
 
         return payload
 
-    async def send_bulk(self, recipients: list, content: dict, context: dict) -> dict:
+    async def send_bulk(self, recipients: list, content: dict, context: dict, record_id: str = None) -> dict:
         """
         Send notification to multiple recipients efficiently
 

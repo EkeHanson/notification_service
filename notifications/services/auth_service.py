@@ -8,10 +8,13 @@ from urllib3.util.retry import Retry
 logger = logging.getLogger('notifications.auth_service')
 
 class AuthServiceClient:
-    """Client for communicating with the Auth Service"""
+    """Client for communicating with the Auth Service and Tenant Service"""
 
     def __init__(self):
-        self.base_url = settings.AUTH_SERVICE_URL.rstrip('/')
+        # Use API gateway for external service calls
+        self.gateway_url = getattr(settings, 'API_GATEWAY_URL', settings.GATEWAY_URL).rstrip('/')
+        self.auth_base_url = getattr(settings, 'API_GATEWAY_URL', settings.AUTH_SERVICE_URL).rstrip('/')  # Use gateway for auth calls
+        self.tenant_base_url = getattr(settings, 'TENANT_SERVICE_URL', settings.AUTH_SERVICE_URL).rstrip('/')
         self.timeout = getattr(settings, 'AUTH_SERVICE_TIMEOUT', 10)
 
         # Setup retry strategy
@@ -39,7 +42,7 @@ class AuthServiceClient:
 
     def get_tenant_details(self, tenant_id: str, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Fetch tenant details from auth service
+        Fetch tenant details through API gateway
 
         Args:
             tenant_id: UUID of the tenant
@@ -49,10 +52,11 @@ class AuthServiceClient:
             Tenant details dict or None if not found/error
         """
         try:
-            url = f"{self.base_url}/api/tenants/{tenant_id}/"
+            # Use API gateway for tenant details
+            url = f"{self.gateway_url}/api/tenant/tenants/{tenant_id}/"
             headers = self._get_headers(token)
 
-            logger.info(f"Fetching tenant details for {tenant_id}")
+            logger.info(f"Fetching tenant details for {tenant_id} via gateway")
             response = self.session.get(url, headers=headers, timeout=self.timeout)
             response.raise_for_status()
 
@@ -78,7 +82,7 @@ class AuthServiceClient:
             Token payload with tenant info or None if invalid
         """
         try:
-            url = f"{self.base_url}/api/token/verify/"
+            url = f"{self.gateway_url}/api/token/validate/"
             headers = self._get_headers()
             data = {'token': token}
 
@@ -109,13 +113,14 @@ class AuthServiceClient:
         tenant_details = self.get_tenant_details(tenant_id, token)
 
         if not tenant_details:
-            # Return default branding
+            # Return better default branding based on tenant_id
+            tenant_prefix = str(tenant_id)[:8]  # Convert UUID to string first
             return {
-                'name': 'Default Company',
+                'name': f'Tenant {tenant_prefix}',  # Show first 8 chars of tenant ID
                 'logo_url': None,
-                'primary_color': '#FF0000',
-                'secondary_color': '#FADBD8',
-                'email_from': 'noreply@default.com'
+                'primary_color': '#007bff',
+                'secondary_color': '#6c757d',
+                'email_from': f'noreply@{tenant_prefix}.local'
             }
 
         return {

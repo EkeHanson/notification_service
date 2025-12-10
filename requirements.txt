@@ -16,11 +16,12 @@ django-filter==23.5
 django-extensions==3.2.3
 twilio==9.3.0  # For SMS
 firebase-admin==6.5.0  # For Firebase Push Notifications
-kafka-python==2.0.2  # For Kafka producer/consumer
+kafka-python>=2.0.2  # For Kafka producer/consumer
 django-environ
 drf-yasg==1.21.7
 channels==4.1.0  # For WebSockets
 channels_redis==4.2.0  # Redis backend
+daphne==4.2.1  # ASGI server for WebSockets
 
 # Testing dependencies
 pytest==8.0.0

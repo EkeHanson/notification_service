@@ -10,6 +10,10 @@ from .app_handlers import (
     ContentEngagementHandler
 )
 from .security_handlers import TwoFactorAuthHandler
+from .document_handlers import (
+    DocumentExpiryHandler,
+    DocumentAcknowledgmentHandler
+)
 from typing import Dict, List, Any, Optional
 import logging
 
@@ -32,7 +36,9 @@ class EventRegistry:
             TaskAssignmentHandler(),
             CommentMentionHandler(),
             ContentEngagementHandler(),
-            TwoFactorAuthHandler()
+            TwoFactorAuthHandler(),
+            DocumentExpiryHandler(),
+            DocumentAcknowledgmentHandler()
         ]
 
         for handler in handlers:

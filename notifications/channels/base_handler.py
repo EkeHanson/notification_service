@@ -10,7 +10,7 @@ class BaseHandler(ABC):
         self.credentials = credentials
 
     @abstractmethod
-    async def send(self, recipient: str, content: dict, context: dict) -> Dict[str, Any]:
+    async def send(self, recipient: str, content: dict, context: dict, record_id: str = None) -> Dict[str, Any]:
         """Send message and return {'success': bool, 'error': str, 'response': any}"""
         pass
 

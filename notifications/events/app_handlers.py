@@ -230,6 +230,10 @@ class ContentEngagementHandler(BaseEventHandler):
             }
         }
 
+    def _get_email_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        # Content engagement doesn't use email notifications
+        return {}
+
     def _get_push_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
         return {
             'title': 'New {{engagement_type}}',

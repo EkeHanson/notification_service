@@ -118,10 +118,11 @@ class MicroserviceRS256JWTMiddleware(MiddlewareMixin):
                 raise AuthenticationFailed(f"Unsupported algorithm: {alg}")
 
             unverified_payload = jwt.decode(token, options={"verify_signature": False})
-            tenant_id = unverified_payload.get("tenant_unique_id")  # Matching your HR
+            tenant_id = unverified_payload.get("tenant_id")  # Use integer tenant_id for auth service
+            tenant_unique_id = unverified_payload.get("tenant_unique_id")
             tenant_schema = unverified_payload.get("tenant_schema")
-            
-            logger.info(f"JWT validation: kid={kid}, tenant_id={tenant_id}, tenant_schema={tenant_schema}")
+
+            logger.info(f"JWT validation: kid={kid}, tenant_id={tenant_id}, tenant_unique_id={tenant_unique_id}, tenant_schema={tenant_schema}")
 
             resp = requests.get(
                 f"{settings.AUTH_SERVICE_URL}/api/public-key/{kid}/?tenant_id={tenant_id}",
@@ -148,7 +149,8 @@ class MicroserviceRS256JWTMiddleware(MiddlewareMixin):
             
             request.jwt_payload = payload
             request.user = SimpleUser(payload)
-            request.tenant_id = tenant_id  # Set for easy access in views
+            request.tenant_id = tenant_unique_id  # Set for easy access in views (UUID)
+            request.user_id = payload.get('user', {}).get('id')  # Set user_id for compatibility
             
             logger.info(f"Authenticated user: {request.user.email}, tenant: {request.tenant_id}")
 

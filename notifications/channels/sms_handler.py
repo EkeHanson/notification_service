@@ -97,7 +97,7 @@ class SMSHandler(BaseHandler):
             'message_length': message_length
         }
 
-    async def send(self, recipient: str, content: dict, context: dict) -> dict:
+    async def send(self, recipient: str, content: dict, context: dict, record_id: str = None) -> dict:
         """
         Send SMS to a single recipient
 

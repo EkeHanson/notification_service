@@ -135,11 +135,12 @@ const socket = new WebSocket(wsUrl);
 ```
 
 ### Message Types Handled
-- `connection_established` - Connection confirmation
-- `notification` - User-specific notifications
+- `connection_established` - Connection confirmation with queued message delivery
+- `notification` - User-specific notifications (real-time or queued)
 - `broadcast` - Tenant-wide announcements
 - `pong` - Heartbeat responses
 - `unread_count` - Notification count updates
+- `mark_read` - Mark notification as read (delivery receipt)
 
 ### Connection Management
 - Connections are tenant-isolated
@@ -151,13 +152,43 @@ const socket = new WebSocket(wsUrl);
 - Group-based messaging reduces individual sends
 - No external API calls (fastest channel)
 
+### Message Persistence for Offline Users ✅
+In-app notifications now support persistence for offline users. Messages are stored in the database and delivered when users reconnect.
+
+**Database Model:**
+```python
+class InAppMessage(models.Model):
+    tenant_id = models.UUIDField()
+    notification_record = models.OneToOneField(NotificationRecord)
+    recipient = models.CharField()  # user_id or 'all'
+    title = models.CharField()
+    body = models.TextField()
+    data = JSONField()
+    status = models.CharField()  # pending, sent, delivered
+    sent_at = models.DateTimeField(null=True)
+    delivered_at = models.DateTimeField(null=True)
+    read_at = models.DateTimeField(null=True)
+    # ... additional fields
+```
+
+**Delivery Flow:**
+1. Message saved to database with `pending` status
+2. Attempt real-time delivery via WebSocket
+3. If successful, status updated to `sent`
+4. When user connects, queued messages are delivered and marked as `delivered`
+5. Users can mark messages as `read` via WebSocket
+
+**WebSocket Message Types:**
+- `notification` - Real-time or queued notification
+- `connection_established` - Connection confirmation with queued message delivery
+- `mark_read` - Mark notification as read
+
 ### Future Enhancements
-- Message persistence/queue for offline users
 - Rich media support (images, links)
 - User preferences (notification types to receive)
-- Delivery receipts and read status
 - Push fallback for disconnected users
 - Message threading/conversations
+- Message expiration and cleanup policies
 
 ## API Integration
 
@@ -190,6 +221,47 @@ const socket = new WebSocket(wsUrl);
 {
   "id": "uuid",
   "status": "pending"
+}
+```
+
+### Retrieve In-App Messages
+**GET** `/api/notifications/inapp-messages/`
+
+**Query Parameters:**
+- `status` - Filter by status (pending, sent, delivered)
+- `recipient` - Filter by recipient user ID
+- `limit` - Number of messages to retrieve (default: 50)
+
+**Response:**
+```json
+{
+  "count": 25,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": "uuid",
+      "title": "New Task Assigned",
+      "body": "You have been assigned a new task",
+      "data": {"task_id": "123"},
+      "status": "delivered",
+      "sent_at": "2024-01-01T12:00:00Z",
+      "delivered_at": "2024-01-01T12:05:00Z",
+      "read_at": "2024-01-01T12:10:00Z",
+      "priority": "high"
+    }
+  ]
+}
+```
+
+### Mark Message as Read
+**POST** `/api/notifications/inapp-messages/{id}/mark-read/`
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Message marked as read"
 }
 ```
 

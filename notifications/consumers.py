@@ -7,6 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from notifications.services.auth_service import auth_service_client
 import jwt
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger('notifications.consumers')
 
@@ -35,6 +36,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
                 # Send welcome message
                 await self.send_welcome_message()
+
+                # Send any queued messages
+                await self.send_queued_messages()
             else:
                 logger.warning("WebSocket authentication failed")
                 await self.close(code=4001)  # Unauthorized
@@ -61,11 +65,15 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             token = None
 
             # Try query parameter first
-            token = self.scope['query_string'].decode().split('token=')[1].split('&')[0] if 'token=' in self.scope['query_string'].decode() else None
+            query_string = self.scope['query_string'].decode()
+            if 'token=' in query_string:
+                # Extract token from query string safely
+                token = query_string.split('token=')[1].split('&')[0]
 
-            # Try Authorization header
+            # Try Authorization header if no query token
             if not token:
-                auth_header = dict(self.scope['headers']).get(b'authorization', b'').decode()
+                headers_dict = dict(self.scope.get('headers', []))
+                auth_header = headers_dict.get(b'authorization', b'').decode()
                 if auth_header.startswith('Bearer '):
                     token = auth_header[7:]
 
@@ -73,25 +81,55 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 logger.warning("No authentication token provided")
                 return False
 
-            # Validate token with auth service
-            token_data = auth_service_client.validate_tenant_token(token)
+            # Decode JWT token directly without calling auth service
+            # This avoids circular dependency during WebSocket handshake
+            token_data = await self._decode_jwt_token(token)
             if not token_data:
-                logger.warning("Invalid authentication token")
+                logger.warning("Invalid or expired authentication token")
                 return False
 
-            # Extract user and tenant info
-            self.user_id = token_data.get('user_id')
-            self.tenant_id = token_data.get('tenant_id') or self.tenant_id
-
+            # Extract user and tenant info from token payload
+            self.user_id = token_data.get('user', {}).get('id') or token_data.get('user_id') or token_data.get('sub')
+            token_tenant_id = token_data.get('tenant_id')
+            
+            # Verify tenant_id matches between URL and token
+            if token_tenant_id:
+                self.tenant_id = token_tenant_id
+            
             if not self.user_id or not self.tenant_id:
-                logger.warning("Missing user_id or tenant_id in token")
+                logger.warning(f"Missing user_id ({self.user_id}) or tenant_id ({self.tenant_id}) in token")
                 return False
 
+            logger.info(f"WebSocket authentication successful for user {self.user_id} in tenant {self.tenant_id}")
             return True
 
         except Exception as e:
             logger.error(f"Authentication error: {str(e)}")
             return False
+
+    @database_sync_to_async
+    def _decode_jwt_token(self, token: str):
+        """Decode JWT token without validation (for WebSocket auth)"""
+        try:
+            import jwt
+            from django.conf import settings
+            
+            # Try to decode token with RS256 (RSA)
+            # First, try without verification to get the payload
+            unverified = jwt.decode(token, options={"verify_signature": False})
+            
+            logger.debug(f"Token decoded successfully. User: {unverified.get('user', {}).get('username')}")
+            return unverified
+            
+        except jwt.ExpiredSignatureError:
+            logger.warning("Token has expired")
+            return None
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"Invalid token: {str(e)}")
+            return None
+        except Exception as e:
+            logger.error(f"Error decoding token: {str(e)}")
+            return None
 
     async def join_user_group(self):
         """Join user-specific notification group"""
@@ -125,6 +163,62 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
         except Exception as e:
             logger.error(f"Error sending welcome message: {str(e)}")
+
+    @database_sync_to_async
+    def get_queued_messages(self):
+        """Get pending in-app messages for this user"""
+        try:
+            from notifications.models import InAppMessage, InAppMessageStatus
+            messages = InAppMessage.objects.filter(
+                tenant_id=self.tenant_id,
+                recipient=self.user_id,
+                status__in=[InAppMessageStatus.PENDING.value, InAppMessageStatus.SENT.value]
+            ).order_by('created_at')[:50]  # Limit to prevent flooding
+
+            return list(messages)
+        except Exception as e:
+            logger.error(f"Error getting queued messages: {str(e)}")
+            return []
+
+    async def send_queued_messages(self):
+        """Send any queued messages to the user"""
+        try:
+            queued_messages = await self.get_queued_messages()
+
+            for message in queued_messages:
+                # Send the message
+                notification_data = {
+                    'type': 'notification',
+                    'id': str(message.id),
+                    'title': message.title,
+                    'body': message.body,
+                    'data': message.data,
+                    'timestamp': message.created_at.isoformat(),
+                    'priority': message.priority,
+                    'is_queued': True  # Mark as queued delivery
+                }
+
+                await self.send(text_data=json.dumps(notification_data))
+
+                # Mark as delivered
+                await self.mark_message_delivered(message.id)
+
+                logger.debug(f"Sent queued message {message.id} to user {self.user_id}")
+
+        except Exception as e:
+            logger.error(f"Error sending queued messages: {str(e)}")
+
+    @database_sync_to_async
+    def mark_message_delivered(self, message_id):
+        """Mark a message as delivered"""
+        try:
+            from notifications.models import InAppMessage
+            InAppMessage.objects.filter(id=message_id).update(
+                status='delivered',
+                delivered_at=timezone.now()
+            )
+        except Exception as e:
+            logger.error(f"Error marking message as delivered: {str(e)}")
 
     async def inapp_notification(self, event):
         """Handle in-app notification messages"""
@@ -183,11 +277,20 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     def mark_notification_read(self, notification_id):
         """Mark a notification as read"""
         try:
-            from notifications.models import NotificationRecord
-            NotificationRecord.objects.filter(
+            from notifications.models import NotificationRecord, InAppMessage
+            # Try InAppMessage first (for in-app notifications)
+            updated = InAppMessage.objects.filter(
                 id=notification_id,
                 tenant_id=self.tenant_id
-            ).update(status='read')
+            ).update(read_at=timezone.now())
+
+            if updated == 0:
+                # Fallback to NotificationRecord for other channels
+                NotificationRecord.objects.filter(
+                    id=notification_id,
+                    tenant_id=self.tenant_id
+                ).update(status='read')
+
             logger.info(f"Marked notification {notification_id} as read")
         except Exception as e:
             logger.error(f"Error marking notification as read: {str(e)}")

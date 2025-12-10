@@ -17,6 +17,19 @@ from notifications.events.app_handlers import (
 from notifications.events.security_handlers import (
     TwoFactorAuthHandler
 )
+from notifications.events.user_handlers import (
+    UserProfileUpdateHandler,
+    UserAccountActionHandler,
+    UserPasswordChangeHandler
+)
+from notifications.events.review_handlers import (
+    ReviewApprovedHandler,
+    ReviewQRScannedHandler
+)
+from notifications.events.document_handlers import (
+    DocumentExpiryHandler,
+    DocumentAcknowledgmentHandler
+)
 
 logger = logging.getLogger('notifications.consumers')
 
@@ -44,6 +57,23 @@ class EventConsumer:
             'auth.2fa.code.requested': TwoFactorAuthHandler(),
             'auth.2fa.attempt.failed': TwoFactorAuthHandler(),
             'auth.2fa.method.changed': TwoFactorAuthHandler(),
+
+            # Document Events
+            'user.document.expiry.warning': DocumentExpiryHandler(),
+            'user.document.expired': DocumentExpiryHandler(),
+            'document.acknowledged': DocumentAcknowledgmentHandler(),
+
+            # User Data Change Events
+            'user.profile.updated': UserProfileUpdateHandler(),
+            'user.account.locked': UserAccountActionHandler(),
+            'user.account.unlocked': UserAccountActionHandler(),
+            'user.account.suspended': UserAccountActionHandler(),
+            'user.account.activated': UserAccountActionHandler(),
+            'user.password.changed': UserPasswordChangeHandler(),
+
+            # Review Events
+            'reviews.approved': ReviewApprovedHandler(),
+            'reviews.qr_scanned': ReviewQRScannedHandler(),
         }
 
         logger.info(f"Registered {len(self.event_handlers)} event handlers")

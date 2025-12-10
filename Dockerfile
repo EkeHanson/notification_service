@@ -28,10 +28,10 @@ RUN curl -L https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-EXPOSE 3001
+EXPOSE 3002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3001/api/notifications/health/ || exit 1
+    CMD curl -f http://localhost:3002/api/notifications/health/ || exit 1
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]

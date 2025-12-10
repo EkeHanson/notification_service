@@ -166,7 +166,7 @@ class LoginSecurityHandler(BaseEventHandler):
 
     def get_default_channels(self, event_type: str) -> List[str]:
         if event_type == 'user.login.failed':
-            return [ChannelType.EMAIL, ChannelType.SMS, ChannelType.PUSH]
+            return [ChannelType.EMAIL, ChannelType.SMS, ChannelType.PUSH, ChannelType.INAPP]
         return [ChannelType.EMAIL, ChannelType.INAPP]
 
     def get_template_data(self, event_payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -245,11 +245,24 @@ class LoginSecurityHandler(BaseEventHandler):
     def _get_inapp_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
         if event_type == 'user.login.succeeded':
             return {
-                'title': 'New Login Detected',
+                'title': '🔐 New Login Detected',
                 'body': 'A new login was detected on your account from {{location}}',
                 'data': {
-                    'type': 'login_notification',
-                    'action': 'view_activity'
+                    'type': 'login_success',
+                    'action': 'view_activity',
+                    'priority': 'normal'
+                }
+            }
+        elif event_type == 'user.login.failed':
+            return {
+                'title': '🚨 Security Alert: Failed Login',
+                'body': 'A failed login attempt was detected from {{location}}. Attempt #{{attempt_count}}',
+                'data': {
+                    'type': 'login_failed',
+                    'action': 'view_security',
+                    'priority': 'urgent',
+                    'failure_reason': context.get('failure_reason'),
+                    'ip_address': context.get('ip_address')
                 }
             }
         return {}

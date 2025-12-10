@@ -27,29 +27,36 @@ python manage.py migrate
 
 ### 4. Start Services
 
-For **new tenants** (automatic setup):
 ```bash
-# Configure your email credentials in .env file first
-# Then start the notification service
+# Start the notification service
 docker-compose up -d
 
-# Start event processing
+# Start event processing (Kafka consumer)
 python manage.py process_events --topics auth-events app-events security-events
 
-# Tenants can now send events immediately - no manual setup required!
+# Start Celery workers for async notification sending
+celery -A notification_service worker -l info
 ```
 
 **Docker Environment Variables:**
-The Docker containers automatically load all notification credentials from your `.env` file. Make sure to uncomment and configure the appropriate variables:
+The Docker containers automatically load all notification credentials from your `.env` file. For development/testing, use MailHog:
 
 ```bash
-# For email notifications
-EMAIL_HOST=mail.privateemail.com
-EMAIL_PORT=465
-EMAIL_USE_SSL=True
-EMAIL_HOST_USER=support@cmvp.net
-EMAIL_HOST_PASSWORD=your-actual-password
-DEFAULT_FROM_EMAIL=support@cmvp.net
+# For email notifications (Development/Testing with MailHog)
+EMAIL_HOST=mailhog
+EMAIL_PORT=1025
+EMAIL_USE_SSL=False
+EMAIL_HOST_USER=
+EMAIL_HOST_PASSWORD=
+DEFAULT_FROM_EMAIL=test@example.com
+
+# For production email (uncomment and configure)
+# EMAIL_HOST=smtp.gmail.com
+# EMAIL_PORT=587
+# EMAIL_USE_SSL=False
+# EMAIL_HOST_USER=your-email@gmail.com
+# EMAIL_HOST_PASSWORD=your-app-password
+# DEFAULT_FROM_EMAIL=noreply@yourcompany.com
 ```
 
 **Testing Docker Configuration:**
@@ -89,37 +96,47 @@ Tenants from the auth-service can now use the notification service immediately w
 
 ```bash
 # No setup required! Tenants automatically get default credentials
-# Just start sending events - the system will use fallbacks
+# Just start sending events via Kafka - the system will use fallbacks
 ```
 
 **How it works:**
-- When a tenant sends their first notification event, the system automatically creates default credentials if none exist
-- Default credentials are configured globally in `notification_service/settings.py` and can be overridden via environment variables
-- Tenants can upgrade to custom credentials later using the manual setup process or API
+- When a tenant sends their first notification event via Kafka, the system automatically creates default credentials if none exist
+- Default credentials use test/development settings suitable for initial setup
+- Tenants can upgrade to custom credentials later using the manual setup process
 
 **Default Credentials Location:**
 The default credentials are defined in `notification_service/notification_service/settings.py`:
 
 ```python
 # Default notification credentials (configurable via environment variables)
+# These are used for new tenants who haven't set up custom credentials
 DEFAULT_EMAIL_CREDENTIALS = {
-    'smtp_host': env('DEFAULT_SMTP_HOST', default='smtp.gmail.com'),
-    'smtp_port': env.int('DEFAULT_SMTP_PORT', default=587),
-    'username': env('DEFAULT_SMTP_USERNAME', default='test@example.com'),
-    'password': env('DEFAULT_SMTP_PASSWORD', default='test_password'),
-    'from_email': env('DEFAULT_FROM_EMAIL', default='noreply@example.com'),
-    'use_ssl': env.bool('DEFAULT_SMTP_USE_SSL', default=False)
+    'smtp_host': env('EMAIL_HOST', default='mailhog'),          # MailHog for testing
+    'smtp_port': int(env('EMAIL_PORT', default='1025') or '1025'),
+    'username': env('EMAIL_HOST_USER', default=''),             # No auth for MailHog
+    'password': env('EMAIL_HOST_PASSWORD', default=''),         # No auth for MailHog
+    'from_email': env('DEFAULT_FROM_EMAIL', default='test@example.com'),
+    'use_ssl': env.bool('EMAIL_USE_SSL', default=False)         # No SSL for MailHog
 }
 
 # Django global email configuration
 EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
-EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+EMAIL_HOST = env('EMAIL_HOST', default='mailhog')
+EMAIL_PORT = env.int('EMAIL_PORT', default=1025)
 EMAIL_USE_SSL = env.bool('EMAIL_USE_SSL', default=False)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='test@example.com')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='test_password')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@example.com')
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='test@example.com')
 ```
+
+**Credential Priority System:**
+The system uses a smart credential hierarchy:
+
+1. **Custom Tenant Credentials** (`is_custom=True`): Used exclusively when tenants configure their own credentials via API
+2. **Auto-generated Defaults** (`is_custom=False`): Working defaults created automatically for new tenants
+3. **Settings Defaults**: Fallback credentials from `settings.py` for brand new tenants
+
+**Important:** Once a tenant sets up custom credentials (`is_custom=True`), the system will ONLY use those credentials - no automatic fallback to defaults. This ensures tenants are responsible for maintaining their own notification delivery.
 
 **Updating Default Credentials:**
 1. **Via Environment Variables** (recommended for production):
@@ -155,7 +172,7 @@ Tenants can manage their credentials programmatically via REST API:
 # List current credentials
 GET /api/notifications/credentials/
 
-# Create/update credentials
+# Create custom credentials (is_custom automatically set to true)
 POST /api/notifications/credentials/
 {
   "channel": "email",
@@ -165,12 +182,14 @@ POST /api/notifications/credentials/
     "username": "your-email@gmail.com",
     "password": "your-app-password",
     "from_email": "noreply@yourcompany.com",
+    "use_ssl": false,
     "use_tls": true
   },
+  "is_custom": false,
   "is_active": true
 }
 
-# Update existing credentials
+# Update existing custom credentials
 PUT /api/notifications/credentials/{id}/
 {
   "credentials": {
@@ -179,16 +198,23 @@ PUT /api/notifications/credentials/{id}/
     "username": "new-email@company.com",
     "password": "new-password",
     "from_email": "noreply@company.com",
+    "use_ssl": false,
     "use_tls": true
-  }
+  },
+  "is_active": true
 }
 ```
 
 **API Endpoints:**
-- `GET /api/notifications/credentials/` - List tenant credentials
-- `POST /api/notifications/credentials/` - Create or update credentials (use same channel to update existing)
+- `GET /api/notifications/credentials/` - List tenant credentials (shows `is_custom` field)
+- `POST /api/notifications/credentials/` - Create custom credentials (`is_custom` set to `true`)
+- `PUT /api/notifications/credentials/{id}/` - Update existing credentials
 
-**Note:** Individual credential updates/deletes require admin access. For programmatic credential management, use POST with the same channel to update existing credentials.
+**Important Notes:**
+- Credentials created via API are marked as `is_custom=true`
+- Custom credentials take priority and have **no automatic fallback**
+- If custom credentials fail, tenants must fix them manually
+- Only use custom credentials when you're confident they work
 
 ### 5. Start Services
 
@@ -325,10 +351,10 @@ NotificationTemplate.objects.create(
 The service automatically processes these event types:
 
 #### Authentication Events
-- `user.registration.completed` → Welcome email
+- `user.registration.completed` → Welcome email + in-app notification
 - `user.password.reset.requested` → Password reset email/SMS
-- `user.login.succeeded` → Security notification
-- `user.login.failed` → Security alert
+- `user.login.succeeded` → Security notification + in-app alert
+- `user.login.failed` → Security alert (email/SMS/push/in-app)
 
 #### Application Events
 - `invoice.payment.failed` → Payment failure notification
@@ -341,8 +367,18 @@ The service automatically processes these event types:
 - `auth.2fa.attempt.failed` → Failed 2FA alert
 - `auth.2fa.method.changed` → Security settings change
 
+#### Document Events
+- `user.document.expiry.warning` → Document expiring soon (30, 14, 7, 3, 1 days)
+- `user.document.expired` → Document has expired
+
+#### In-App Notification Events
+- Real-time WebSocket notifications for urgent alerts
+- User-specific and tenant-wide broadcasts
+- Automatic delivery to connected React clients
+
 ### Event Payload Format
 
+#### Authentication Events
 ```json
 {
   "event_type": "user.registration.completed",
@@ -356,6 +392,107 @@ The service automatically processes these event types:
   "metadata": {
     "source": "auth_service",
     "version": "1.0"
+  }
+}
+```
+
+#### Document Events
+```json
+{
+  "event_type": "user.document.expiry.warning",
+  "tenant_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "payload": {
+    "full_name": "John Doe",
+    "user_email": "john@example.com",
+    "document_type": "Driver's Licence",
+    "document_name": "Driver's Licence",
+    "expiry_date": "2024-01-15",
+    "days_left": 7,
+    "message": "Your Driver's Licence is expiring soon. Please renew immediately to avoid employment disruption.",
+    "timezone": "Africa/Lagos"
+  },
+  "metadata": {
+    "event_id": "evt-uuid-here",
+    "source": "application-system",
+    "created_at": "2024-01-01T12:00:00Z"
+  }
+}
+```
+
+#### 2FA Events with Tenant Details (Recommended Architecture)
+```json
+{
+  "event_type": "auth.2fa.code.requested",
+  "tenant_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "payload": {
+    "user_id": "user-uuid",
+    "user_email": "john@example.com",
+    "user_first_name": "John",
+    "user_last_name": "Doe",
+    "2fa_code": "123456",
+    "method": "email",
+    "expires_at": "2024-01-01T12:15:00Z",
+    "ip_address": "192.168.1.100",
+    "user_agent": "Mozilla/5.0...",
+    "tenant_details": {
+      "name": "Acme Corporation",
+      "logo_url": "https://acme.com/logo.png",
+      "primary_color": "#007bff",
+      "secondary_color": "#6c757d",
+      "email_from": "noreply@acme.com"
+    }
+  },
+  "metadata": {
+    "event_id": "evt-uuid-here",
+    "source": "auth-service",
+    "created_at": "2024-01-01T12:00:00Z"
+  }
+}
+```
+
+**Note:** Including `tenant_details` in the event payload eliminates the need for the notification service to make API calls back to the auth-service, improving decoupling and resilience.
+
+#### Login Events
+```json
+{
+  "event_type": "user.login.succeeded",
+  "tenant_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "payload": {
+    "user_email": "john@example.com",
+    "login_time": "2024-01-01T12:00:00Z",
+    "ip_address": "192.168.1.100",
+    "location": "Lagos, Nigeria",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  },
+  "metadata": {
+    "event_id": "evt-uuid-here",
+    "source": "auth-service",
+    "created_at": "2024-01-01T12:00:00Z"
+  }
+}
+```
+
+```json
+{
+  "event_type": "user.login.failed",
+  "tenant_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "payload": {
+    "user_email": "john@example.com",
+    "login_time": "2024-01-01T12:00:00Z",
+    "ip_address": "192.168.1.100",
+    "location": "Unknown Location",
+    "failure_reason": "Invalid password",
+    "attempt_count": 3,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  },
+  "metadata": {
+    "event_id": "evt-uuid-here",
+    "source": "auth-service",
+    "created_at": "2024-01-01T12:00:00Z"
   }
 }
 ```
@@ -384,6 +521,20 @@ open http://localhost:5556
 
 ### Common Issues
 
+#### Email Testing with MailHog
+```bash
+# Start MailHog (included in docker-compose.yml)
+docker-compose up mailhog
+
+# View sent emails in browser
+open http://localhost:8025
+
+# Test email sending
+curl -X POST http://localhost:3001/api/notifications/test-email/ \
+  -H "Content-Type: application/json" \
+  -d '{"recipient": "test@example.com", "subject": "Test", "body": "Hello {name}!", "context": {"name": "World"}}'
+```
+
 #### Kafka Connection Issues
 ```bash
 # Check Kafka connectivity
@@ -391,19 +542,36 @@ python manage.py process_events --topics test --max-events 1
 ```
 
 #### Template Rendering Errors
+Templates support both `{variable}` and `{{variable}}` syntax. If variables aren't rendering:
 ```bash
-# Check template placeholders
+# Check template content
 python manage.py shell
 >>> from notifications.models import NotificationTemplate
->>> template = NotificationTemplate.objects.first()
->>> print(template.placeholders)
+>>> template = NotificationTemplate.objects.filter(channel='email').first()
+>>> print("Subject:", template.content.get('subject'))
+>>> print("Body:", template.content.get('body'))
 ```
 
-#### Credential Encryption Issues
+#### Credential Issues
 ```bash
-# Re-encrypt credentials
-python manage.py setup_tenant_credentials <tenant_id> --all --interactive
+# Check tenant credentials
+python manage.py shell
+>>> from notifications.models import TenantCredentials
+>>> creds = TenantCredentials.objects.filter(tenant_id='your-tenant-id', channel='email')
+>>> for cred in creds:
+...     print(f"is_custom: {cred.is_custom}, active: {cred.is_active}")
+...     print(f"credentials: {cred.credentials}")
+
+# Reset to defaults (removes custom credentials)
+>>> TenantCredentials.objects.filter(tenant_id='your-tenant-id', channel='email').delete()
 ```
+
+#### Credential Priority Issues
+- **Custom credentials** (`is_custom=True`): Used exclusively, no fallback
+- **Auto-generated defaults** (`is_custom=False`): Working defaults for new tenants
+- **Settings defaults**: Fallback for brand new tenants
+
+If emails aren't sending with custom credentials, check that they're properly configured and working.
 
 ## 🚀 Production Deployment
 
@@ -454,9 +622,42 @@ AUTH_SERVICE_URL=http://localhost:8000
 # Encryption
 ENCRYPTION_KEY=your-32-character-encryption-key
 
-# Email (optional defaults)
-DEFAULT_FROM_EMAIL=noreply@example.com
+# Email Configuration (Production)
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_SSL=False
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+DEFAULT_FROM_EMAIL=noreply@yourcompany.com
+
+# SMS (Production)
+DEFAULT_TWILIO_ACCOUNT_SID=your-twilio-account-sid
+DEFAULT_TWILIO_AUTH_TOKEN=your-twilio-auth-token
+DEFAULT_TWILIO_FROM_NUMBER=+1234567890
+
+# Push Notifications (Production)
+DEFAULT_FIREBASE_PROJECT_ID=your-firebase-project-id
+DEFAULT_FIREBASE_PRIVATE_KEY_ID=your-private-key-id
+DEFAULT_FIREBASE_PRIVATE_KEY=your-private-key
+DEFAULT_FIREBASE_CLIENT_EMAIL=firebase@your-project.iam.gserviceaccount.com
+DEFAULT_FIREBASE_CLIENT_ID=your-client-id
+DEFAULT_FIREBASE_CLIENT_X509_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/firebase@your-project.iam.gserviceaccount.com
 ```
+
+### Credential Management in Production
+
+**Important:** The system uses a hierarchical credential system:
+
+1. **Custom Tenant Credentials** (`is_custom=true`): Tenants configure via API, no fallback
+2. **Auto-generated Defaults** (`is_custom=false`): Working defaults for new tenants
+3. **Settings Defaults**: Fallback from environment variables
+
+**Production Setup:**
+- Configure working defaults in environment variables
+- Tenants can override with custom credentials via API
+- Monitor credential health and tenant notification delivery
+- Custom credentials take precedence and have no automatic fallback
 
 ### Scaling Considerations
 
@@ -470,6 +671,50 @@ DEFAULT_FROM_EMAIL=noreply@example.com
 ### Run Tests
 ```bash
 python run_tests.py
+```
+
+### Email Testing with MailHog
+```bash
+# Start MailHog (automatically included in docker-compose.yml)
+docker-compose up mailhog
+
+# Access MailHog web interface
+open http://localhost:8025
+
+# Send test email via API
+curl -X POST http://localhost:3001/api/notifications/test-email/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -d '{
+    "recipient": "test@example.com",
+    "subject": "Test Email",
+    "body": "Hello {name}, your code is {code}!",
+    "context": {"name": "John", "code": "123456"}
+  }'
+
+# Check MailHog for the sent email
+# Expected result: Properly branded email with tenant name, formatted timestamps, and working templates
+```
+
+### Email Branding & Templates
+The system now supports:
+- ✅ **Tenant-specific branding**: Shows actual tenant name instead of "Default Company"
+- ✅ **Proper timestamp formatting**: Converts ISO dates to readable format
+- ✅ **Template variable support**: Both `{variable}` and `{{variable}}` syntax
+- ✅ **Fallback branding**: Uses tenant ID prefix when auth service unavailable
+
+**Example Improved Email:**
+```
+Tenant 7ac6d583
+
+Hi John Doe,
+
+Your two-factor authentication code is: 123456
+
+This code will expire at 2024-01-01 12:00:00 UTC.
+
+Best regards,
+Tenant 7ac6d583 Security Team
 ```
 
 ### Test Event Processing
@@ -497,6 +742,28 @@ test_event = {
 
 success = event_consumer.process_event(test_event)
 print(f"Event processed: {success}")
+```
+
+### Template Testing
+Templates now support both `{variable}` and `{{variable}}` syntax:
+```python
+# Test template rendering
+from notifications.channels.email_handler import EmailHandler
+
+handler = EmailHandler("test-tenant", {})
+content = {
+    "subject": "Welcome {name}!",
+    "body": "Your code is {code} and expires at {expires_at}."
+}
+context = {
+    "name": "John",
+    "code": "123456",
+    "expires_at": "2024-01-01T12:00:00Z"
+}
+
+rendered = handler._render_content(content, context)
+print("Subject:", rendered['subject'])  # "Welcome John!"
+print("Body:", rendered['body'])        # "Your code is 123456 and expires at 2024-01-01T12:00:00Z."
 ```
 
 ## 📞 Support

@@ -75,7 +75,7 @@ def send_notification_task(self, record_id: str, channel: str, recipient: str, c
 
         # Use async_to_sync for proper async handling in Celery
         from asgiref.sync import async_to_sync
-        result = async_to_sync(handler.send)(recipient, content, context)
+        result = async_to_sync(handler.send)(recipient, content, context, record_id)
 
         if result['success']:
             record.status = NotificationStatus.SUCCESS.value

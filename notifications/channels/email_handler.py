@@ -11,11 +11,64 @@ class EmailHandler(BaseHandler):
         super().__init__(tenant_id, credentials)
         self.tenant_branding = None
 
-    def _get_tenant_branding(self):
-        """Get tenant branding information"""
+
+    def _get_tenant_branding(self, context=None):
+        """Get tenant branding information from context or fallback to API"""
         if self.tenant_branding is None:
-            self.tenant_branding = auth_service_client.get_tenant_branding(self.tenant_id)
+            # First try to get branding from context (from event payload)
+            if context and 'tenant_name' in context:
+                self.tenant_branding = {
+                    'name': context.get('tenant_name', 'Platform'),
+                    'logo_url': context.get('tenant_logo'),
+                    'primary_color': context.get('primary_color', '#007bff'),
+                    'secondary_color': context.get('secondary_color', '#6c757d'),
+                    'email_from': context.get('email_from')
+                }
+                logger.info(f"Using tenant branding from event payload: {self.tenant_branding['name']}")
+            else:
+                # Fallback to API call if no context provided
+                try:
+                    self.tenant_branding = auth_service_client.get_tenant_branding(self.tenant_id)
+                    logger.info(f"Using tenant branding from API: {self.tenant_branding['name']}")
+                except Exception as e:
+                    logger.warning(f"Failed to fetch tenant branding for {self.tenant_id}: {str(e)}")
+                    # Use default branding
+                    tenant_prefix = str(self.tenant_id)[:8]  # Convert UUID to string first
+                    self.tenant_branding = {
+                        'name': f'Tenant {tenant_prefix}',
+                        'logo_url': None,
+                        'primary_color': '#007bff',
+                        'secondary_color': '#6c757d',
+                        'email_from': f'noreply@{tenant_prefix}.local'
+                    }
         return self.tenant_branding
+
+    def _render_content(self, content: dict, context: dict) -> dict:
+        """Render email content with context variables"""
+        try:
+            rendered = {}
+
+            # Render subject and body - handle both single and double curly braces
+            for key in ['subject', 'body']:
+                if key in content:
+                    text = content[key]
+
+                    # Replace double curly braces with single ones for Python formatting
+                    for ctx_key, value in context.items():
+                        text = text.replace(f'{{{{{ctx_key}}}}}', str(value))
+                    # Also handle single curly braces
+                    try:
+                        text = text.format(**context)
+                    except KeyError:
+                        pass  # Keep original if formatting fails
+
+                    rendered[key] = text
+
+            return rendered
+
+        except Exception as e:
+            logger.error(f"Email content rendering error: {str(e)}")
+            return content
 
     def _render_html_template(self, content: dict, context: dict) -> str:
         """Render HTML email template with tenant branding"""
@@ -31,8 +84,9 @@ class EmailHandler(BaseHandler):
             'logo_url': branding['logo_url']
         })
 
-        subject = content.get('subject', '').format(**context)
-        body_text = content.get('body', '').format(**context)
+        rendered = self._render_content(content, context)
+        subject = rendered.get('subject', '')
+        body_text = rendered.get('body', '')
 
         # Create HTML version with branding
         html_body = self._create_html_email(subject, body_text, branding, context)
@@ -130,14 +184,24 @@ class EmailHandler(BaseHandler):
 
         return html_template
 
-    async def send(self, recipient: str, content: dict, context: dict) -> dict:
+    async def send(self, recipient: str, content: dict, context: dict, record_id: str = None) -> dict:
         try:
-            # Get tenant branding
-            branding = self._get_tenant_branding()
+            # Get tenant branding (prefer from context, fallback to API)
+            branding = self._get_tenant_branding(context)
 
             # Render subject and text body
-            subject = content.get('subject', '').format(**context)
-            body_text = content.get('body', '').format(**context)
+            logger.info(f"Content before rendering: {content}")
+            logger.info(f"Context before rendering: {context}")
+            rendered_content = self._render_content(content, context)
+            subject = rendered_content.get('subject', '')
+            body_text = rendered_content.get('body', '')
+            logger.info(f"Rendered content: {rendered_content}")
+
+            # Debug logging
+            logger.info(f"Template context keys: {list(context.keys())}")
+            logger.info(f"Code value in context: {context.get('code', 'NOT_FOUND')}")
+            logger.info(f"Body template before rendering: {content.get('body', '')[:100]}...")
+            logger.info(f"Body after rendering: {body_text[:100]}...")
 
             # Add branding to context
             context.update({
@@ -152,27 +216,96 @@ class EmailHandler(BaseHandler):
             # Create HTML version
             html_body = self._render_html_template(content, context)
 
+            # Credentials are already decrypted by the validator
+            creds = self.credentials
+
+            # DEBUG: Log the actual credentials being used
+            logger.info(f"🔍 DEBUG - Raw credentials: {creds}")
+            logger.info(f"🔍 DEBUG - SMTP Host: {creds.get('smtp_host')}")
+            logger.info(f"🔍 DEBUG - SMTP Port: {creds.get('smtp_port')}")
+            logger.info(f"🔍 DEBUG - Username: {creds.get('username')}")
+            logger.info(f"🔍 DEBUG - Password length: {len(creds.get('password', ''))}")
+            logger.info(f"🔍 DEBUG - Use SSL: {creds.get('use_ssl')}")
+            logger.info(f"🔍 DEBUG - Use TLS: {creds.get('use_tls')}")
+
             # Determine from email
-            from_email = self.credentials.get('from_email') or branding.get('email_from') or settings.DEFAULT_FROM_EMAIL
+            from_email = creds.get('from_email') or branding.get('email_from') or settings.DEFAULT_FROM_EMAIL
 
-            # Send email with both text and HTML versions
-            email = EmailMultiAlternatives(
-                subject=subject,
-                body=body_text,
-                from_email=from_email,
-                to=[recipient]
-            )
+            # Log email details before sending
+            logger.info(f"📧 Sending email for tenant {self.tenant_id}")
+            logger.info(f"   From: {from_email}")
+            logger.info(f"   To: {recipient}")
+            logger.info(f"   Subject: {subject}")
+            logger.info(f"   Content preview: {body_text[:100]}...")
+            logger.info(f"   Using SMTP: {creds.get('smtp_host')}:{creds.get('smtp_port')}")
 
-            # Attach HTML version
-            email.attach_alternative(html_body, "text/html")
+            # Temporarily override Django's email settings for this tenant
+            from django.conf import settings as django_settings
+            original_backend = getattr(django_settings, 'EMAIL_BACKEND', None)
+            original_host = getattr(django_settings, 'EMAIL_HOST', None)
+            original_port = getattr(django_settings, 'EMAIL_PORT', None)
+            original_user = getattr(django_settings, 'EMAIL_HOST_USER', None)
+            original_pass = getattr(django_settings, 'EMAIL_HOST_PASSWORD', None)
+            original_ssl = getattr(django_settings, 'EMAIL_USE_SSL', None)
+            original_tls = getattr(django_settings, 'EMAIL_USE_TLS', None)
 
-            # Send the email
-            sent = email.send(fail_silently=False)
+            try:
+                # Override Django settings with tenant credentials
+                django_settings.EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+                django_settings.EMAIL_HOST = creds.get('smtp_host')
+                django_settings.EMAIL_PORT = creds.get('smtp_port')
+                django_settings.EMAIL_HOST_USER = creds.get('username')
+                django_settings.EMAIL_HOST_PASSWORD = creds.get('password')
+                django_settings.EMAIL_USE_SSL = creds.get('use_ssl', False)
+                django_settings.EMAIL_USE_TLS = creds.get('use_tls', False)
 
-            if sent:
-                return {'success': True, 'response': f'Sent to {sent} recipients'}
-            else:
-                return {'success': False, 'error': 'Send failed', 'response': None}
+                # DEBUG: Log Django settings being used
+                logger.info(f"🔧 Django EMAIL_HOST: {django_settings.EMAIL_HOST}")
+                logger.info(f"🔧 Django EMAIL_PORT: {django_settings.EMAIL_PORT}")
+                logger.info(f"🔧 Django EMAIL_HOST_USER: {django_settings.EMAIL_HOST_USER}")
+                logger.info(f"🔧 Django EMAIL_USE_SSL: {django_settings.EMAIL_USE_SSL}")
+                logger.info(f"🔧 Django EMAIL_USE_TLS: {django_settings.EMAIL_USE_TLS}")
+
+                # Send email with both text and HTML versions
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=body_text,
+                    from_email=from_email,
+                    to=[recipient]
+                )
+
+                # Attach HTML version
+                email.attach_alternative(html_body, "text/html")
+
+                # Send the email
+                sent = email.send(fail_silently=False)
+
+                if sent:
+                    logger.info(f"✅ Email sent successfully to {recipient}")
+                else:
+                    logger.warning(f"⚠️ Email send returned 0 for {recipient}")
+
+                if sent:
+                    return {'success': True, 'response': f'Sent to {sent} recipients'}
+                else:
+                    return {'success': False, 'error': 'Send failed', 'response': None}
+
+            finally:
+                # Restore original Django email settings
+                if original_backend is not None:
+                    django_settings.EMAIL_BACKEND = original_backend
+                if original_host is not None:
+                    django_settings.EMAIL_HOST = original_host
+                if original_port is not None:
+                    django_settings.EMAIL_PORT = original_port
+                if original_user is not None:
+                    django_settings.EMAIL_HOST_USER = original_user
+                if original_pass is not None:
+                    django_settings.EMAIL_HOST_PASSWORD = original_pass
+                if original_ssl is not None:
+                    django_settings.EMAIL_USE_SSL = original_ssl
+                if original_tls is not None:
+                    django_settings.EMAIL_USE_TLS = original_tls
 
         except Exception as e:
             logger.error(f"Email send error for tenant {self.tenant_id}: {str(e)}")

@@ -6,12 +6,8 @@ from django.http import JsonResponse
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-# Health check endpoint using proper JsonResponse
+# Health check endpoint
 def health_check(request):
-    """
-    Simple health check endpoint for the notification service.
-    Returns a JSON response confirming the service is operational.
-    """
     return JsonResponse({"status": "healthy", "service": "notification_service"})
 
 urlpatterns = [
@@ -27,7 +23,4 @@ urlpatterns = [
 
     # Notifications app endpoints
     path('api/notifications/', include('notifications.urls')),
-
-    # Health check endpoint
-    path('api/notifications/health/', health_check, name='health'),
 ]
