@@ -99,8 +99,21 @@ IMPORTANT: Keep these credentials secure and do not share them with anyone.'''
         }
 
 
+
 class OTPHandler(BaseEventHandler):
     """Handles OTP code requested events"""
+
+    def _get_inapp_content(self, event_type: str, context: dict) -> dict:
+        return {
+            'title': 'Your Login Verification Code',
+            'body': f"Your OTP code is: {context.get('2fa_code', 'N/A')} (expires in {context.get('expires_in_seconds', 300)} seconds)",
+            'data': {
+                'type': 'otp',
+                'code': context.get('2fa_code', ''),
+                'method': context.get('2fa_method', ''),
+                'expires_in_seconds': context.get('expires_in_seconds', 300),
+            }
+        }
 
     def _get_email_content(self, event_type: str, context: dict) -> dict:
         from django.template.loader import render_to_string
@@ -114,7 +127,7 @@ class OTPHandler(BaseEventHandler):
     def __init__(self):
         super().__init__()
         self.supported_events = ['auth.2fa.code.requested']
-        self.default_channels = [ChannelType.EMAIL]
+        self.default_channels = [ChannelType.EMAIL, ChannelType.INAPP]
         self.priority = 'high'
 
     def can_handle(self, event_type: str) -> bool:
@@ -150,7 +163,7 @@ class OTPHandler(BaseEventHandler):
                 }
 
     def process_event(self, event: Dict[str, Any]) -> Optional[NotificationRecord]:
-        """Process OTP event with deduplication to prevent multiple emails"""
+        """Process OTP event with deduplication to prevent multiple emails and always include INAPP channel."""
         try:
             event_type = event['event_type']
             event_payload = event['payload']
@@ -181,6 +194,10 @@ class OTPHandler(BaseEventHandler):
             if recent_otp:
                 logger.info(f"Skipping duplicate OTP notification for {recipient} in tenant {tenant_id} (database check)")
                 return None
+
+            # Patch: Always include INAPP in default_channels for this event
+            if ChannelType.INAPP not in self.default_channels:
+                self.default_channels.append(ChannelType.INAPP)
 
             # Proceed with normal processing
             return super().process_event(event)

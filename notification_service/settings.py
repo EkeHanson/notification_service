@@ -55,7 +55,7 @@ INSTALLED_APPS = [
     'django_filters',
     'channels',
     'django_extensions',
-    'notifications',  # Main app for notification models/views
+    'notifications.apps.NotificationsConfig',  # Main app for notification models/views
 ]
 
 
