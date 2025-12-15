@@ -599,54 +599,102 @@ export const fetchTimezoneChoices = async () => {
 // };
 
 // Helper to get the current tenant ID
-export const getCurrentTenantUniqueId = () => {
-  const tenantUniqueId = localStorage.getItem("tenantUniqueId");
-  // Example: return localStorage.getItem('tenantUniqueId') || '09145372-eb5d-40ff-9d93-ca49425a16e6';
-  return tenantUniqueId || "default-tenant"; // Fallback for development
+// Helper to get the current tenant ID from JWT token
+export const getCurrentTenantId = () => {
+  try {
+    // Get token from localStorage
+    const token = localStorage.getItem("token");
+    
+    if (!token) {
+      console.warn("No token found in localStorage");
+      return "default-tenant"; // Fallback for development
+    }
+    
+    // Decode JWT token (middle part is the payload)
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      console.error("Invalid JWT token format");
+      return "default-tenant";
+    }
+    
+    // Decode base64 URL encoded payload
+    const payload = tokenParts[1];
+    const decodedPayload = JSON.parse(
+      atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    );
+    
+    // Extract tenant_id from the payload
+    const tenantId = decodedPayload.tenant_unique_id;
+    
+    return tenantId ? String(tenantId) : "default-tenant"; // Convert to string for consistency
+  } catch (error) {
+    console.error("Error extracting tenant ID from token:", error);
+    return "default-tenant"; // Fallback for development
+  }
 };
 
-// Fetch tenant configuration
+// Fetch tenant email configuration
 export const fetchTenantConfig = async () => {
   try {
-    const tenantUniqueId = getCurrentTenantUniqueId();
+    const tenantId = getCurrentTenantId();
     const response = await apiClient.get(
-      `/api/tenants/tenants/${tenantUniqueId}/`
+      `api/notifications/tenants/${tenantId}/email-providers`
     );
     const data = response.data;
 
-    // Add dates if not present
-    data.created_date = data.created_at
-      ? data.created_at.split("T")[0]
-      : new Date().toISOString().split("T")[0];
-    data.last_modified =
-      data.updated_at ||
-      data.created_at ||
-      `${
-        new Date().toISOString().split("T")[0]
-      } ${new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })}`;
+    // Assuming the response is an array of email providers or a single object
+    // If it's an array, return the first one or handle accordingly
+    if (Array.isArray(data) && data.length > 0) {
+      const config = data[0]; // Assuming we want the first/default one
+      // Add dates if not present
+      config.created_date = config.created_at
+        ? config.created_at.split("T")[0]
+        : new Date().toISOString().split("T")[0];
+      config.last_modified =
+        config.updated_at ||
+        config.created_at ||
+        `${
+          new Date().toISOString().split("T")[0]
+        } ${new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}`;
+      return config;
+    } else if (data && typeof data === 'object') {
+      // Single object response
+      data.created_date = data.created_at
+        ? data.created_at.split("T")[0]
+        : new Date().toISOString().split("T")[0];
+      data.last_modified =
+        data.updated_at ||
+        data.created_at ||
+        `${
+          new Date().toISOString().split("T")[0]
+        } ${new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}`;
+      return data;
+    }
 
-    // Use tenantId as id if not present
-    data.id = data.id || tenantUniqueId;
-    return data;
+    return null; // No configuration found
   } catch (error) {
     handleApiError(error);
     throw error;
   }
 };
 
-// Update tenant configuration
+// Update tenant email configuration
 export const updateTenantConfig = async (emailProviderId, configData) => {
   try {
+    const tenantId = getCurrentTenantId();
     const payload = {
       ...configData,
       isDefault: true, // Always set to true as per requirement
     };
 
     const response = await apiClient.put(
-      `/tenants/global/email-providers/${emailProviderId}`,
+      `api/notifications/tenants/${tenantId}/email-providers/${emailProviderId}`,
       payload
     );
     return response.data;
@@ -656,10 +704,10 @@ export const updateTenantConfig = async (emailProviderId, configData) => {
   }
 };
 
-// Create tenant configuration
+// Create tenant email configuration
 export const createTenantConfig = async (configData) => {
   try {
-    const tenantUniqueId = getCurrentTenantUniqueId();
+    const tenantId = getCurrentTenantId();
 
     const payload = {
       ...configData,
@@ -667,7 +715,7 @@ export const createTenantConfig = async (configData) => {
     };
 
     const response = await apiClient.post(
-      `/api/notifications/tenants/${tenantUniqueId}/email-providers/`,
+      `api/notifications/tenants/${tenantId}/email-providers`,
       payload
     );
     return response.data;
@@ -1011,18 +1059,17 @@ export const fetchUserChats = async () => {
 export const createDirectChat = async (participantId) => {
   try {
     // Use the conversations endpoint to create a direct conversation
-    // The documentation specifies creating conversations at:
-    // POST /api/notifications/chat/conversations/
+    // The backend expects target_user_id for direct conversations
     const payload = {
-      title: null,
+      title: "Direct Chat",
       conversation_type: "direct",
-      participants: [participantId],
+      target_user_id: participantId,
     };
     const response = await apiClient.post(
       "/api/notifications/chat/conversations/",
       payload
     );
-    // Return the created conversation (shape depends on backend; follow createChatConversation)
+    // Return the created conversation
     return response.data;
   } catch (error) {
     // Use validation-aware handler when creating conversations
@@ -1184,7 +1231,10 @@ export const fetchConversationMessages = async (conversationId, params = {}) => 
 
 export const sendConversationMessage = async (conversationId, messageData) => {
   try {
-    const response = await apiClient.post(`/api/notifications/chat/conversations/${conversationId}/messages/`, messageData);
+    const response = await apiClient.post(`/api/notifications/chat/conversations/${conversationId}/messages/`, {
+      conversation: conversationId,
+      ...messageData
+    });
     return response.data;
   } catch (error) {
     handleApiErrorWithValidation(error);
@@ -1314,6 +1364,28 @@ export const markMessageAsRead = async (messageId) => {
     return response.data;
   } catch (error) {
     handleApiError(error);
+    throw error;
+  }
+};
+
+// Password reset API
+export const initiatePasswordReset = async (identifier) => {
+  try {
+    const response = await apiClient.post("/api/user/password/reset/", identifier);
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+    throw error;
+  }
+};
+
+// Password reset confirm API
+export const confirmPasswordReset = async (resetData) => {
+  try {
+    const response = await apiClient.post("/api/user/password/reset/confirm/", resetData);
+    return response.data;
+  } catch (error) {
+    handleApiErrorWithValidation(error);
     throw error;
   }
 };

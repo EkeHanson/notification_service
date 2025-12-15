@@ -3,6 +3,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated  # Or custom
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.db import models
 from notifications.models import (
     NotificationRecord, TenantCredentials, NotificationTemplate, Campaign,
     DeviceToken, PushAnalytics, SMSAnalytics, ChatConversation, ChatParticipant,
@@ -73,6 +76,7 @@ class NotificationListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save()
 
+@method_decorator(csrf_exempt, name='dispatch')
 class TenantCredentialsListCreateView(generics.ListCreateAPIView):
     serializer_class = TenantCredentialsSerializer
     pagination_class = StandardResultsSetPagination
@@ -85,7 +89,6 @@ class TenantCredentialsListCreateView(generics.ListCreateAPIView):
         tenant_id = request.tenant_id
         channel = request.data.get('channel')
         existing = TenantCredentials.objects.all_with_deleted().filter(tenant_id=tenant_id, channel=channel).first()
-        logger.info(f"Upsert check: tenant_id={tenant_id}, channel={channel}, existing={existing}")
         if existing:
             # Update existing (even if soft deleted)
             if existing.is_deleted:
@@ -331,16 +334,53 @@ class ChatConversationListCreateView(generics.ListCreateAPIView):
             is_active=True
         ).distinct()
 
+    def create(self, request, *args, **kwargs):
+        tenant_id = request.tenant_id
+        user_id = request.user_id
+        conversation_type = request.data.get('conversation_type', 'direct')
+        target_user_id = request.data.get('target_user_id')
+
+        # For direct conversations, check if one already exists between users
+        if conversation_type == 'direct' and target_user_id:
+            # Find existing direct conversation between these two users
+            existing_conversation = ChatConversation.objects.filter(
+                tenant_id=tenant_id,
+                conversation_type='direct',
+                participants__user_id__in=[user_id, target_user_id]
+            ).annotate(
+                participant_count=models.Count('participants')
+            ).filter(participant_count=2).first()
+
+            if existing_conversation:
+                # Return existing conversation
+                serializer = self.get_serializer(existing_conversation)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # Create new conversation
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         conversation = serializer.save()
+        tenant_id = self.request.tenant_id
+        user_id = self.request.user_id
+        target_user_id = self.request.data.get('target_user_id')
 
-        # Add creator as participant with admin role
+        # Add creator as participant
         ChatParticipant.objects.create(
-            tenant_id=self.request.tenant_id,
+            tenant_id=tenant_id,
             conversation=conversation,
-            user_id=self.request.user_id,
+            user_id=user_id,
             role='admin'
         )
+
+        # For direct conversations, add target user as participant
+        if conversation.conversation_type == 'direct' and target_user_id:
+            ChatParticipant.objects.create(
+                tenant_id=tenant_id,
+                conversation=conversation,
+                user_id=target_user_id,
+                role='member'
+            )
 
 
 class ChatConversationDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -548,7 +588,7 @@ class InAppMessageDetailView(generics.RetrieveUpdateAPIView):
 
         return InAppMessage.objects.filter(
             tenant_id=tenant_id,
-            recipient=str(user_id),
+            recipient__in=[str(user_id), 'all'],  # Allow access to user's messages or broadcast messages
             is_deleted=False
         )
 

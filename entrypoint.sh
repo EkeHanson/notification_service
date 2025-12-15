@@ -30,20 +30,31 @@ case "$SERVICE_TYPE" in
 import os
 import sys
 import time
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'notification_service.settings')
-import django
-django.setup()
-
+print('DEBUG: Starting Python script...')
 try:
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'notification_service.settings')
+    print('DEBUG: Django settings set')
+    import django
+    print('DEBUG: Django imported')
+    django.setup()
+    print('DEBUG: Django setup complete')
+
+    print('DEBUG: Importing kafka consumer...')
     from notifications.utils.kafka_consumer import start_kafka_consumer
-    print('Kafka consumer started successfully')
+    print('DEBUG: Kafka consumer imported successfully')
+    print('DEBUG: Starting consumer...')
     start_kafka_consumer()
+    print('DEBUG: Consumer started successfully')
 except ImportError as e:
     print(f'Failed to import Kafka consumer: {e}')
     print('Please ensure kafka-python is properly installed')
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 except Exception as e:
     print(f'Failed to start Kafka consumer: {e}')
+    import traceback
+    traceback.print_exc()
     print('Will retry in 30 seconds...')
     time.sleep(30)
     # Retry once
@@ -51,6 +62,8 @@ except Exception as e:
         start_kafka_consumer()
     except Exception as e2:
         print(f'Final failure: {e2}')
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
         "
         ;;

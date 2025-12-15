@@ -10,11 +10,17 @@ def get_websocket_urlpatterns():
     import notifications.routing  # Import here to avoid AppRegistryNotReady
     return notifications.routing.websocket_urlpatterns
 
+def get_websocket_application():
+    from .websocket_middleware import WebSocketJWTMiddleware
+    return WebSocketJWTMiddleware(
+        AuthMiddlewareStack(
+            URLRouter(
+                get_websocket_urlpatterns()
+            )
+        )
+    )
+
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
-        URLRouter(
-            get_websocket_urlpatterns()
-        )
-    ),
+    "websocket": get_websocket_application(),
 })

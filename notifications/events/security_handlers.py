@@ -50,9 +50,11 @@ class TwoFactorAuthHandler(BaseEventHandler):
                 # If formatting fails, use as-is
                 pass
 
-        # Extract tenant details from event payload if available
-        tenant_data = event_payload.get('tenant_details', {})
+        # Get login domain
+        login_domain = event_payload.get('login_domain', '')
+        login_domain_text = f" to {login_domain}" if login_domain else ""
 
+        # Extract tenant details directly from event payload
         return {
             'user_id': event_payload.get('user_id', ''),
             'user_first_name': event_payload.get('user_first_name', ''),
@@ -67,12 +69,14 @@ class TwoFactorAuthHandler(BaseEventHandler):
             'old_method': event_payload.get('old_method', ''),
             'new_method': event_payload.get('new_method', ''),
             'changed_at': event_payload.get('changed_at', ''),
-            # Include tenant branding data from event payload
-            'tenant_name': tenant_data.get('name', 'Platform'),
-            'tenant_logo': tenant_data.get('logo_url'),
-            'primary_color': tenant_data.get('primary_color', '#007bff'),
-            'secondary_color': tenant_data.get('secondary_color', '#6c757d'),
-            'email_from': tenant_data.get('email_from')
+            'login_domain': login_domain,
+            'login_domain_text': login_domain_text,
+            # Include tenant branding data directly from event payload
+            'tenant_name': event_payload.get('tenant_name', 'Platform'),
+            'tenant_logo': event_payload.get('tenant_logo'),
+            'primary_color': event_payload.get('tenant_primary_color', '#007bff'),
+            'secondary_color': event_payload.get('tenant_secondary_color', '#6c757d'),
+            'email_from': event_payload.get('email_from')
         }
 
     def _get_email_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -86,17 +90,23 @@ class TwoFactorAuthHandler(BaseEventHandler):
                 greeting = "Hi,"
 
             return {
-                'subject': 'Your Two-Factor Authentication Code',
-                'body': greeting + '''
+                'subject': 'Your Two-Factor Authentication Code - {tenant_name}',
+                'body': f'''{greeting}
 
-Your two-factor authentication code is: {code}
+You requested to log in{context.get('login_domain_text', '')} with your {context.get('tenant_name', 'our platform')} account.
 
-This code will expire at {expires_at}.
+Your two-factor authentication code is:
 
-If you didn't request this code, please secure your account immediately.
+{context.get('code', 'N/A')}
+
+This code will expire in 5 minutes.
+
+For your security, this code was requested from IP address: {context.get('ip_address', 'Unknown')}
+
+If you didn't request this code, please secure your account immediately by changing your password and contacting our support team.
 
 Best regards,
-{tenant_name} Security Team'''
+The {context.get('tenant_name', 'Platform')} Security Team'''
             }
         elif event_type == 'auth.2fa.attempt.failed':
             return {

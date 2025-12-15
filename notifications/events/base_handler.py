@@ -80,20 +80,30 @@ class BaseEventHandler(ABC):
             event_payload = event['payload']
             tenant_id = event['tenant_id']
 
+            logger.info(f"🎯 EVENT HANDLER: Processing {event_type} for tenant {tenant_id}")
+
             if not self.can_handle(event_type):
+                logger.info(f"🎯 Handler {self.__class__.__name__} cannot handle {event_type}")
                 return None
 
             recipient = self.get_recipient(event_payload)
+            logger.info(f"🎯 Recipient identified: {recipient}")
             if not recipient:
-                logger.warning(f"No recipient found for event {event_type}")
+                logger.warning(f"❌ No recipient found for event {event_type}")
                 return None
 
             channels_content = self.get_channel_content(event_type, event_payload)
+            logger.info(f"🎯 Channel content generated: {list(channels_content.keys())}")
+
 
             # Create notifications for each channel
             notifications = []
             for channel, content in channels_content.items():
                 if content:  # Only create if content is provided
+                    logger.info(f"🔔 Creating notification for channel: {channel}")
+                    if not tenant_id:
+                        logger.error(f"❌ tenant_id is missing, cannot create NotificationRecord for channel {channel} and recipient {recipient}")
+                        continue
                     notification = NotificationRecord.objects.create(
                         tenant_id=tenant_id,
                         channel=channel,  # channel is already a string (enum value)
@@ -104,6 +114,7 @@ class BaseEventHandler(ABC):
                         }
                     )
                     notifications.append(notification)
+                    logger.info(f"✅ Notification created: ID={notification.id}, Channel={channel}")
 
                     # Trigger async sending
                     from notifications.tasks import send_notification_task
@@ -111,10 +122,13 @@ class BaseEventHandler(ABC):
                         str(notification.id), channel, recipient, content,
                         self.get_template_data(event_payload)
                     )
+                    logger.info(f"📤 Async send task queued for notification {notification.id}")
 
-            logger.info(f"Processed event {event_type} for tenant {tenant_id}: {len(notifications)} notifications created")
+            logger.info(f"🎯 Processed event {event_type} for tenant {tenant_id}: {len(notifications)} notifications created")
             return notifications[0] if notifications else None
 
         except Exception as e:
-            logger.error(f"Error processing event {event.get('event_type')}: {str(e)}")
+            logger.error(f"❌ Error processing event {event.get('event_type')}: {str(e)}")
+            import traceback
+            logger.error(f"❌ Full traceback: {traceback.format_exc()}")
             return None

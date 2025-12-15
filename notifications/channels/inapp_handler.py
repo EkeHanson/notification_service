@@ -32,11 +32,14 @@ class InAppHandler(BaseHandler):
             dict: Success status and response data
         """
         try:
+            logger.info(f"🔔 INAPP SEND: Starting for tenant {self.tenant_id}, recipient {recipient}")
             # Generate unique notification ID
             self.notification_id = str(uuid.uuid4())
+            logger.info(f"🔔 Generated notification ID: {self.notification_id}")
 
             # Render content with context
             rendered_content = self._render_content(content, context)
+            logger.info(f"🔔 Rendered content: {rendered_content}")
 
             # Save message to database for persistence
             inapp_message = None
@@ -54,14 +57,15 @@ class InAppHandler(BaseHandler):
                         priority=rendered_content.get('data', {}).get('priority', 'normal'),
                         message_type=self._determine_message_type(recipient)[0]
                     )
-                    logger.debug(f"Saved in-app message {inapp_message.id} for notification {record_id}")
+                    logger.info(f"💾 Saved in-app message {inapp_message.id} for notification {record_id}")
                 except NotificationRecord.DoesNotExist:
-                    logger.warning(f"NotificationRecord {record_id} not found for in-app message")
+                    logger.warning(f"❌ NotificationRecord {record_id} not found for in-app message")
                 except Exception as e:
-                    logger.error(f"Error saving in-app message: {str(e)}")
+                    logger.error(f"❌ Error saving in-app message: {str(e)}")
 
             channel_layer = get_channel_layer()
             if not channel_layer:
+                logger.error(f"❌ Channel layer not configured for tenant {self.tenant_id}")
                 if inapp_message:
                     inapp_message.status = InAppMessageStatus.FAILED.value
                     inapp_message.save(update_fields=['status'])
@@ -69,22 +73,25 @@ class InAppHandler(BaseHandler):
 
             # Determine message type and target groups
             message_type, target_groups = self._determine_message_type(recipient)
+            logger.info(f"🎯 Message type: {message_type}, Target groups: {target_groups}")
 
             # Prepare message payload
             message_payload = self._prepare_message_payload(rendered_content, message_type)
+            logger.info(f"📦 Message payload: {json.dumps(message_payload, indent=2)}")
 
             # Send to all target groups
             sent_groups = []
             for group_name in target_groups:
                 try:
+                    logger.info(f"📤 Sending to group: {group_name}")
                     await channel_layer.group_send(group_name, message_payload)
                     sent_groups.append(group_name)
-                    logger.debug(f"Sent {message_type} to group: {group_name}")
+                    logger.info(f"✅ Sent {message_type} to group: {group_name}")
                 except Exception as e:
-                    logger.error(f"Failed to send to group {group_name}: {str(e)}")
+                    logger.error(f"❌ Failed to send to group {group_name}: {str(e)}")
 
             if sent_groups:
-                logger.info(f"In-app notification sent to {len(sent_groups)} groups for tenant {self.tenant_id}")
+                logger.info(f"🎉 SUCCESS: In-app notification sent to {len(sent_groups)} groups for tenant {self.tenant_id}")
                 # Mark message as sent
                 if inapp_message:
                     inapp_message.mark_sent()
@@ -98,6 +105,7 @@ class InAppHandler(BaseHandler):
                     }
                 }
             else:
+                logger.error(f"❌ FAILURE: No groups received the message for tenant {self.tenant_id}")
                 # Mark as failed
                 if inapp_message:
                     inapp_message.status = InAppMessageStatus.FAILED.value
@@ -105,7 +113,9 @@ class InAppHandler(BaseHandler):
                 return {'success': False, 'error': 'No groups received the message', 'response': None}
 
         except Exception as e:
-            logger.error(f"In-app send error for tenant {self.tenant_id} to {recipient}: {str(e)}")
+            logger.error(f"❌ INAPP SEND ERROR for tenant {self.tenant_id} to {recipient}: {str(e)}")
+            import traceback
+            logger.error(f"❌ Full traceback: {traceback.format_exc()}")
             # Mark message as failed
             if inapp_message:
                 inapp_message.status = InAppMessageStatus.FAILED.value

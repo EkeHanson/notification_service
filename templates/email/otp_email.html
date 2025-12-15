@@ -1,0 +1,60 @@
+<!-- OTP (2FA) Email Template -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Login Verification Code</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f6f8; margin: 0; padding: 0; }
+    .container { max-width: 500px; margin: 40px auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); overflow: hidden; }
+    .header { background: #007bff; color: #fff; padding: 24px 20px 16px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+    .header h2 { margin: 8px 0 0 0; font-size: 16px; font-weight: 400; }
+    .content { padding: 28px 24px 24px 24px; }
+    .otp-box { background: #f8f9fa; border: 2px solid #007bff; padding: 18px; text-align: center; border-radius: 8px; margin: 24px 0; }
+    .otp-code { font-size: 28px; font-weight: bold; color: #007bff; letter-spacing: 3px; font-family: monospace; }
+    .expires { margin: 10px 0 0 0; font-size: 13px; color: #666; }
+    .steps, .security { margin: 18px 0; padding: 14px; border-radius: 6px; }
+    .steps { background: #e3f2fd; }
+    .steps strong { color: #1976d2; }
+    .steps ol { margin: 10px 0 0 20px; padding: 0; }
+    .security { background: #fff3e0; color: #f57c00; }
+    .details { font-size: 13px; color: #666; margin: 18px 0; }
+    .footer { border-top: 1px solid #eee; margin: 0 -24px; padding: 18px 24px 0 24px; text-align: center; color: #999; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>{{ tenant_name }}</h1>
+      <h2>Login Verification</h2>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>You requested to log in{% if login_domain %} to login to {{ login_domain }}{% endif %} with your {{ tenant_name }} account.</p>
+      <div class="otp-box">
+        <div class="otp-code">{{ 2fa_code }}</div>
+        <div class="expires">Expires in {{ expires_in_seconds|divisibleby:60|yesno:"{{ expires_in_seconds|divisibleby:60 }} minutes,{{ expires_in_seconds }} seconds" }}</div>
+      </div>
+      <div class="steps">
+        <strong>Next steps:</strong>
+        <ol>
+          <li>Copy the code above</li>
+          <li>Return to login page</li>
+          <li>Enter the code</li>
+        </ol>
+      </div>
+      <div class="security">
+        <strong>Security:</strong> If you didn't request this, ignore this email.
+      </div>
+      <div class="details">
+        <strong>Details:</strong> IP {{ ip_address|default:"Unknown" }}
+      </div>
+      <div class="footer">
+        Automated security email from {{ tenant_name }} &bull; support@proliance.com
+      </div>
+    </div>
+  </div>
+</body>
+</html>

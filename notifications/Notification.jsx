@@ -35,6 +35,8 @@ const Notification = ({ onUnreadChange }) => {
     }
   };
 
+
+  
   // WebSocket connection for real-time notifications
   const connectWebSocket = () => {
     try {
@@ -159,17 +161,33 @@ const Notification = ({ onUnreadChange }) => {
   };
 
   // Group notifications by date
+  // const groupedNotifications = notifications.reduce((acc, notif) => {
+  //   const date = formatDate(notif.sent_at);
+  //   if (!acc[date]) acc[date] = [];
+  //   acc[date].push({
+  //     ...notif,
+  //     date,
+  //     time: formatTime(notif.sent_at),
+  //     message: notif.body
+  //   });
+  //   return acc;
+  // }, {});
+
+    // Group notifications by date - FIXED: Use created_at only
   const groupedNotifications = notifications.reduce((acc, notif) => {
-    const date = formatDate(notif.sent_at);
+    const displayDate = notif.created_at; // Use created_at directly
+    const date = formatDate(displayDate);
+    
     if (!acc[date]) acc[date] = [];
     acc[date].push({
       ...notif,
-      date,
-      time: formatTime(notif.sent_at),
-      message: notif.body
+      formattedDate: date,
+      formattedTime: formatTime(displayDate),
+      message: notif.body || notif.message
     });
     return acc;
   }, {});
+
 
   // Calculate unread count
   useEffect(() => {
@@ -195,8 +213,13 @@ const Notification = ({ onUnreadChange }) => {
   if (loading) {
     return (
       <div className="Notification-Main custom-scroll-bar">
-        <div className="loading-notifications">
-          <p>Loading notifications...</p>
+        <div className="loading-notifications" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh', flexDirection: 'column'}}>
+          <svg width="56" height="56" viewBox="0 0 50 50" style={{marginBottom: 12}} aria-hidden>
+            <circle cx="25" cy="25" r="20" stroke="#6366F1" strokeWidth="4" fill="none" strokeLinecap="round" strokeDasharray="31.4 31.4" transform="rotate(-90 25 25)">
+              <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite" />
+            </circle>
+          </svg>
+          <p style={{margin:0, color:'#6b7280'}}>Loading notifications...</p>
         </div>
       </div>
     );
@@ -216,8 +239,9 @@ const Notification = ({ onUnreadChange }) => {
             transition={{ duration: 0.3 }}
           >
             {Object.keys(groupedNotifications).length === 0 ? (
-              <div className="no-notifications">
-                <p>No notifications yet</p>
+              <div className="no-notifications" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh', flexDirection: 'column', color:'#6b7280'}}>
+                <EnvelopeOpenIcon style={{width:64, height:64, marginBottom:12, color:'#9CA3AF'}} />
+                <p style={{margin:0, fontSize:16}}>No notifications yet</p>
               </div>
             ) : (
               Object.keys(groupedNotifications).map((date) => (
@@ -272,8 +296,8 @@ const Notification = ({ onUnreadChange }) => {
                 <ArrowLeftIcon />
               </span>
               <p>
-                {selectedNotification.date} <i className="cirlce-icon"></i>{" "}
-                {selectedNotification.time}
+                {selectedNotification.created_at} <i className="cirlce-icon"></i>{" "}
+                {selectedNotification.created_at}
               </p>
             </div>
             <div className="Notis-Read-Main">

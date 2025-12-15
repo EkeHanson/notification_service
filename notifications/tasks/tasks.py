@@ -28,17 +28,17 @@ def send_bulk_campaign_task(campaign_id: str):
     sub_tasks = group(
         send_notification_task.s(
             str(NotificationRecord.objects.create(
-                tenant_id=campaign.tenant_id,
+                tenant_id=campaign.tenant_id if campaign.tenant_id else None,
                 channel=campaign.channel,
                 recipient=r['recipient'],
                 context=r.get('context', {})
-            ).id),
+            ).id) if campaign.tenant_id else None,
             campaign.channel,
             r['recipient'],
             campaign.content or {},
             r.get('context', {})
         )
-        for r in campaign.recipients
+        for r in campaign.recipients if campaign.tenant_id
     )
 
     # Execute group
@@ -49,7 +49,7 @@ def send_bulk_campaign_task(campaign_id: str):
     # For now, poll or use beat to update status
     # TODO: Implement callback to increment sent_count and set COMPLETED
 
-    log_event('bulk_started', campaign_id, {'total': len(campaign.recipients)})
+    log_event('bulk_started', campaign_id, {'total': len(campaign.recipients)}, tenant_id=str(campaign.tenant_id))
     logger.info(f"Bulk campaign {campaign_id} started with {len(campaign.recipients)} recipients")
 
 # Optional: Callback task
@@ -60,7 +60,7 @@ def update_campaign_completion(self, campaign_id: str, results: list):
     campaign.sent_count = successes
     campaign.status = CampaignStatus.COMPLETED.value if successes == campaign.total_recipients else CampaignStatus.FAILED.value
     campaign.save()
-    log_event('bulk_completed', campaign_id, {'sent': successes})
+    log_event('bulk_completed', campaign_id, {'sent': successes}, tenant_id=str(campaign.tenant_id))
 
 
 @shared_task(bind=True, max_retries=3)
@@ -118,7 +118,7 @@ def send_notification_task(self, record_id: str, channel: str, recipient: str, c
             record.status = NotificationStatus.SUCCESS.value
             record.provider_response = json.dumps(result['response'])
             record.sent_at = timezone.now()
-            log_event('sent', record_id, result)
+            log_event('sent', record_id, result, tenant_id=str(record.tenant_id))
 
             # Produce Kafka event
             producer.send_event(
@@ -145,7 +145,7 @@ def send_notification_task(self, record_id: str, channel: str, recipient: str, c
         if record.retry_count >= record.max_retries:
             record.status = NotificationStatus.FAILED.value
             record.failure_reason = FailureReason.UNKNOWN_ERROR.value
-            log_event('failed', record_id, {'error': str(exc)})
+            log_event('failed', record_id, {'error': str(exc)}, tenant_id=str(record.tenant_id))
 
             # Produce failure event
             producer.send_event(

@@ -31,8 +31,7 @@ class NotificationKafkaConsumer:
             'bootstrap_servers': bootstrap,
             'group_id': getattr(settings, 'KAFKA_GROUP_ID', 'notification-service'),
             'auto_offset_reset': getattr(settings, 'KAFKA_AUTO_OFFSET_RESET', 'latest'),
-            'enable_auto_commit': True,
-            'consumer_timeout_ms': 1000,
+            'enable_auto_commit': False,  # Disable auto commit, commit manually after successful processing
         }
 
         # SSL config if provided
@@ -51,29 +50,47 @@ class NotificationKafkaConsumer:
 
     def start_consuming(self):
         """Start consuming messages"""
+        logger.info("Starting consumer...")
+        self.running = True
         if not self.consumer:
+            logger.info("Creating consumer...")
             self.create_consumer()
+            logger.info("Consumer created successfully")
 
         topics = list(self.topics) if self.topics else []
+        logger.info(f"Available topics from settings: {list(self.topics) if self.topics else 'None'}")
+        logger.info(f"Topics list: {topics}")
         if topics:
+            logger.info(f"Subscribing to topics: {topics}")
             self.consumer.subscribe(topics)
-            logger.info(f"Subscribed to topics: {topics}")
-
-        self.running = True
+            logger.info(f"Successfully subscribed to topics: {topics}")
+        else:
+            logger.error("ERROR: No topics to subscribe to!")
+            return
 
         try:
+            logger.info("Starting consumer polling loop...")
             while self.running:
-                # poll returns dict of partitions to list of records
-                records = self.consumer.poll(timeout_ms=1000)
-                if not records:
-                    continue
+                try:
+                    logger.debug("Polling for messages...")
+                    # poll returns dict of partitions to list of records
+                    records = self.consumer.poll(timeout_ms=1000)
+                    if not records:
+                        logger.debug("No records received in this poll")
+                        continue
 
-                for tp, msgs in records.items():
-                    for msg in msgs:
-                        try:
-                            self.process_message(msg)
-                        except Exception as e:
-                            logger.error(f"Error processing message: {str(e)}")
+                    logger.info(f"Received {len(records)} partition(s) with records")
+                    for tp, msgs in records.items():
+                        logger.info(f"Processing {len(msgs)} messages from partition {tp}")
+                        for msg in msgs:
+                            try:
+                                self.process_message(msg)
+                            except Exception as e:
+                                logger.error(f"Error processing message: {str(e)}")
+                except StopIteration:
+                    # Consumer timeout reached, continue polling
+                    logger.debug("StopIteration caught, continuing polling")
+                    continue
 
         except KeyboardInterrupt:
             logger.info("Consumer interrupted by user")
@@ -104,25 +121,38 @@ class NotificationKafkaConsumer:
 
             event = json.loads(message_value)
 
-            logger.info(f"Received event: {event.get('event_type')} from topic: {msg.topic}")
+            logger.info(f"🔥 KAFKA EVENT RECEIVED: {event.get('event_type')} from topic: {msg.topic}")
+            logger.info(f"🔥 Event payload: {json.dumps(event, indent=2)}")
 
             # Validate event structure
             if not self._validate_event(event):
-                logger.warning(f"Invalid event structure: {event}")
+                logger.warning(f"❌ Invalid event structure: {event}")
+                # Commit offset even for invalid events to avoid reprocessing
+                self.consumer.commit()
                 return
 
             # Process event using registry
+            logger.info(f"🔄 Processing event {event['event_type']} with registry...")
             result = event_registry.process_event(event)
 
             if result:
-                logger.info(f"Successfully processed event {event['event_type']} for tenant {event['tenant_id']}")
+                logger.info(f"✅ Successfully processed event {event['event_type']} for tenant {event['tenant_id']}")
+                logger.info(f"✅ Notification created with ID: {result.id if hasattr(result, 'id') else 'Unknown'}")
+                # Commit offset after successful processing
+                self.consumer.commit()
             else:
-                logger.warning(f"Event {event['event_type']} was not processed")
+                logger.warning(f"❌ Event {event['event_type']} was not processed (no result returned)")
+                # Still commit offset to avoid reprocessing
+                self.consumer.commit()
 
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in message: {str(e)}")
+            logger.error(f"❌ Invalid JSON in message: {str(e)}")
+            # Commit offset for invalid JSON to avoid reprocessing
+            self.consumer.commit()
         except Exception as e:
-            logger.error(f"Error processing message: {str(e)}")
+            logger.error(f"❌ Error processing message: {str(e)}")
+            logger.error(f"❌ Full event data: {raw if 'raw' in locals() else 'N/A'}")
+            # Don't commit offset on processing errors to allow retry
 
     def _validate_event(self, event: dict) -> bool:
         """Validate event structure"""

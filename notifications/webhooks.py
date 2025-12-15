@@ -12,7 +12,9 @@ def webhook_trigger(request):
     content = payload.get('content', {})
     context = payload.get('context', {})
     
-    # Validate & create record
+    # Validate tenant_id
+    if not tenant_id:
+        return Response({'error': 'tenant_id is required'}, status=400)
     record = NotificationRecord.objects.create(
         tenant_id=tenant_id, channel=channel, recipient=recipient,
         content=content, context=context

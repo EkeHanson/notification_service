@@ -70,26 +70,27 @@ class EmailHandler(BaseHandler):
             return content
 
     def _render_html_template(self, content: dict, context: dict) -> str:
-        """Render HTML email template with tenant branding"""
-        branding = self._get_tenant_branding()
+        """Render HTML email template with tenant branding or use custom HTML template if provided"""
+        # If a custom HTML template is specified in content, use it
+        template_name = content.get('html_template')
+        if template_name:
+            from django.template.loader import render_to_string
+            return render_to_string(template_name, context)
 
-        # Update context with branding
+        # Fallback to legacy HTML wrapper if no custom template is specified
+        branding = self._get_tenant_branding()
         context.update({
             'tenant_name': branding['name'],
             'tenant_logo': branding['logo_url'],
             'primary_color': branding['primary_color'],
             'secondary_color': branding['secondary_color'],
-            'company_name': branding['name'],  # Alias for backward compatibility
+            'company_name': branding['name'],
             'logo_url': branding['logo_url']
         })
-
         rendered = self._render_content(content, context)
         subject = rendered.get('subject', '')
         body_text = rendered.get('body', '')
-
-        # Create HTML version with branding
         html_body = self._create_html_email(subject, body_text, branding, context)
-
         return html_body
 
     def _create_html_email(self, subject: str, body_text: str, branding: dict, context: dict) -> str:

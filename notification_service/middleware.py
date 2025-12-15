@@ -6,7 +6,6 @@ from django.utils.deprecation import MiddlewareMixin
 from rest_framework.exceptions import AuthenticationFailed
 from django.http import JsonResponse
 from django.db import close_old_connections, connection
-from django.contrib.auth.models import AnonymousUser
 
 logger = logging.getLogger('notifications')
 
@@ -87,6 +86,7 @@ class MicroserviceRS256JWTMiddleware(MiddlewareMixin):
     
     def process_request(self, request):
         if any(request.path.startswith(path) for path in public_paths):
+            from django.contrib.auth.models import AnonymousUser
             request.user = AnonymousUser()
             request.jwt_payload = None
             request.tenant_id = None
@@ -96,6 +96,7 @@ class MicroserviceRS256JWTMiddleware(MiddlewareMixin):
         
         if not auth_header.startswith('Bearer '):
             logger.warning(f"No Bearer token provided for protected path: {request.path}")
+            from django.contrib.auth.models import AnonymousUser
             request.user = AnonymousUser()
             request.jwt_payload = None
             request.tenant_id = None
@@ -124,6 +125,7 @@ class MicroserviceRS256JWTMiddleware(MiddlewareMixin):
 
             logger.info(f"JWT validation: kid={kid}, tenant_id={tenant_id}, tenant_unique_id={tenant_unique_id}, tenant_schema={tenant_schema}")
 
+            # Call auth service directly for public key
             resp = requests.get(
                 f"{settings.AUTH_SERVICE_URL}/api/public-key/{kid}/?tenant_id={tenant_id}",
                 headers={'Authorization': auth_header},

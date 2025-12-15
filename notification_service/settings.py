@@ -119,10 +119,6 @@ SUPABASE_BUCKET = env('SUPABASE_BUCKET', default='')
 STORAGE_TYPE = env('STORAGE_TYPE', default='supabase')
 
 KAFKA_BOOTSTRAP_SERVERS = env('KAFKA_BOOTSTRAP_SERVERS', default='kafka:9092')
-KAFKA_TOPICS = {
-    'notification_events': 'notification-events',
-    'tenant': 'tenant-events',
-}
 
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://notifications_redis:6379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
@@ -194,13 +190,18 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],  # Remove console handler to avoid HTML debug output
+            'handlers': ['file', 'console'],  # Add console handler
             'level': 'INFO',
             'propagate': True,
         },
         'notifications': {
-            'handlers': ['file'],  # Remove console handler
-            'level': 'INFO',
+            'handlers': ['file', 'console'],  # Add console handler
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'notifications.kafka.consumer': {
+            'handlers': ['console'],  # Only console for consumer
+            'level': 'DEBUG',
             'propagate': False,
         },
     },
@@ -286,3 +287,8 @@ ENCRYPTION_KEY = env('ENCRYPTION_KEY', default='your-32-character-encryption-key
 
 # ======================== Django Email Configuration ========================
 # Global email settings (used by Django's email backend)
+
+
+# docker logs notifications-celery-worker
+# docker logs notifications-kafka-consumer
+# docker logs -f notifications

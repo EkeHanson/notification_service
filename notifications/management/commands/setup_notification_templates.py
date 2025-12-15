@@ -206,6 +206,30 @@ class Command(BaseCommand):
         templates = [
             {
                 'name': '2FA Code',
+                'channel': ChannelType.EMAIL,
+                'content': {
+                    'subject': 'Your Login Verification Code - {{tenant_name}}',
+                    'body': '''
+                    Hi,
+
+                    You requested to log in{{login_domain_text}} with your {{tenant_name}} account.
+
+                    Your verification code is: {{2fa_code}}
+
+                    This code will expire in {{expires_in_seconds}} seconds.
+
+                    If you didn't request this login, please ignore this email.
+
+                    For security reasons, this request was made from IP: {{ip_address}}
+
+                    Best regards,
+                    The {{tenant_name}} Security Team
+                    '''
+                },
+                'placeholders': ['tenant_name', 'login_domain_text', '2fa_code', 'expires_in_seconds', 'ip_address']
+            },
+            {
+                'name': '2FA Code',
                 'channel': ChannelType.SMS,
                 'content': {
                     'body': 'Your {{tenant_name}} verification code is: {{code}}. Expires in 5 minutes.'
@@ -283,4 +307,33 @@ class Command(BaseCommand):
 
     def _update_security_templates(self, tenant_id: str, overwrite: bool) -> int:
         """Update existing security templates if needed"""
-        return 0  # No updates needed for now
+        updated_count = 0
+
+        # Update 2FA Code template to fix login domain text for all tenants
+        all_templates = NotificationTemplate.objects.filter(
+            name='2FA Code',
+            channel=ChannelType.EMAIL
+        )
+
+        for template in all_templates:
+            try:
+                # Check if the template has the old incorrect format
+                current_body = template.content.get('body', '')
+                if 'log in to login' in current_body:
+                    # Fix the template body
+                    corrected_body = current_body.replace(
+                        'You requested to log in to login{{login_domain_text}} with your {{tenant_name}} account.',
+                        'You requested to log in{{login_domain_text}} with your {{tenant_name}} account.'
+                    )
+
+                    if corrected_body != current_body:
+                        template.content['body'] = corrected_body
+                        template.version += 1
+                        template.save()
+                        updated_count += 1
+                        self.stdout.write(f'Updated 2FA Code template for tenant: {template.tenant_id}')
+
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f'Error updating 2FA template for tenant {template.tenant_id}: {str(e)}'))
+
+        return updated_count

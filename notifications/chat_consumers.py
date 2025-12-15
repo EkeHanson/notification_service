@@ -120,6 +120,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_discard(self.conversation_group, self.channel_name)
 
         # Join new conversation
+        self.conversation_id = conversation_id
         self.conversation_group = f"chat_conversation_{self.tenant_id}_{conversation_id}"
         await self.channel_layer.group_add(self.conversation_group, self.channel_name)
 
@@ -564,12 +565,12 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     def set_typing_indicator(self, is_typing):
         """Set or remove typing indicator"""
         try:
-            if is_typing:
+            if is_typing and hasattr(self, 'conversation_id'):
                 # Create or update typing indicator
                 expires_at = timezone.now() + timedelta(seconds=10)
                 TypingIndicator.objects.update_or_create(
                     tenant_id=self.tenant_id,
-                    conversation_id=self.conversation_group.split('_')[-1],  # Extract conversation ID
+                    conversation_id=self.conversation_id,
                     user_id=self.user_id,
                     defaults={'expires_at': expires_at}
                 )

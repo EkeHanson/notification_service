@@ -1,5 +1,6 @@
 from .auth_handlers import (
     UserRegistrationHandler,
+    OTPHandler,
     PasswordResetHandler,
     LoginSecurityHandler
 )
@@ -30,6 +31,7 @@ class EventRegistry:
         """Register all event handlers"""
         handlers = [
             UserRegistrationHandler(),
+            OTPHandler(),
             PasswordResetHandler(),
             LoginSecurityHandler(),
             InvoicePaymentHandler(),
