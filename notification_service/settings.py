@@ -127,6 +127,9 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
+# Celery 6.0+ compatibility: cancel long-running tasks on connection loss
+worker_cancel_long_running_tasks_on_connection_loss = True
+
 # ======================== CORS ========================
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:3000', 'http://localhost:5173'])
 CORS_ALLOW_CREDENTIALS = True

@@ -1,0 +1,102 @@
+
+<!-- Redesigned Base Email Template for Notification Service -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Notification{% endblock %}</title>
+  <style>
+   :root {
+     --primary-color: {{ primary_color|default:'#007bff' }};
+     --secondary-color: {{ secondary_color|default:'#6c757d' }};
+   }
+   body {
+     background: #f4f4f4;
+     margin: 0;
+     padding: 0;
+     font-family: 'Segoe UI', Arial, sans-serif;
+     color: #222;
+   }
+    .email-card {
+      max-width: 520px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.09);
+      overflow: hidden;
+      border: 1px solid #e3e8ee;
+    }
+    .email-content {
+      padding: 36px 32px 32px 32px;
+      font-size: 16px;
+      line-height: 1.7;
+    }
+    .email-header {
+      background: linear-gradient(90deg, var(--primary-color), var(--secondary-color) 90%);
+      color: #fff;
+      padding: 32px 32px 18px 32px;
+      text-align: center;
+    }
+    .email-header img {
+      max-width: 80px;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .email-header h1 {
+      margin: 0 0 6px 0;
+      font-size: 26px;
+      letter-spacing: 1px;
+      font-weight: 700;
+    }
+    .email-header h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 400;
+      opacity: 0.95;
+    }
+    .email-content {
+      padding: 36px 32px 32px 32px;
+      font-size: 16px;
+      line-height: 1.7;
+    }
+    .email-footer {
+      background: #f7f9fa;
+      border-top: 1px solid #e3e8ee;
+      color: #7a869a;
+      font-size: 13px;
+      text-align: center;
+      padding: 18px 32px;
+    }
+    @media (max-width: 600px) {
+      .email-card, .email-content, .email-header, .email-footer {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+      }
+      .email-card {
+        margin: 10px;
+      }
+    }
+  </style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  <div class="email-card">
+    <div class="email-header">
+      {% if tenant_logo %}
+        <img src="{{ tenant_logo }}" alt="{{ tenant_name }} Logo" />
+      {% endif %}
+      <h1>{{ tenant_name }}</h1>
+      <h2>{% block header_subtitle %}{% endblock %}</h2>
+    </div>
+    <div class="email-content">
+      {% block content %}{% endblock %}
+    </div>
+    <div class="email-footer">
+      {% block footer %}If you have questions, contact <a href="mailto:support@proliance.com" style="color:var(--primary-color);text-decoration:none;">support@proliance.com</a>.{% endblock %}
+    </div>
+  </div>
+</body>
+</html>

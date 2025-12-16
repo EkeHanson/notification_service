@@ -127,7 +127,7 @@ class OTPHandler(BaseEventHandler):
     def __init__(self):
         super().__init__()
         self.supported_events = ['auth.2fa.code.requested']
-        self.default_channels = [ChannelType.EMAIL, ChannelType.INAPP]
+        self.default_channels = [ChannelType.EMAIL]
         self.priority = 'high'
 
     def can_handle(self, event_type: str) -> bool:

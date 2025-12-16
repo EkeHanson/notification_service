@@ -5,15 +5,28 @@ The Email Channel handles sending email notifications through SMTP using tenant-
 
 ## Implementation Details
 
+
 ### Handler Class: `EmailHandler`
 Located in `notifications/channels/email_handler.py`
 
 ```python
 class EmailHandler(BaseHandler):
-    async def send(self, recipient: str, content: dict, context: dict) -> dict:
-        # Renders subject and body with context placeholders
-        # Uses Django's send_mail with tenant credentials
+  def send_async(self, recipient: str, content: dict, context: dict, record_id: str = None) -> dict:
+    """
+    Dispatches an email send task asynchronously using Celery.
+    Returns immediately after queuing the task.
+    """
 ```
+
+#### Usage
+To send an email asynchronously:
+
+```python
+handler = EmailHandler(tenant_id, credentials)
+handler.send_async(recipient, content, context)
+```
+
+This will queue the email to be sent in the background by Celery workers, improving response time and throughput.
 
 ### Required Credentials
 Stored in `TenantCredentials` model with channel='email':

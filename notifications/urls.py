@@ -10,6 +10,7 @@ from .views import (
     UserPresenceListView, UserPresenceDetailView, FileUploadView,
     InAppMessageListView, InAppMessageDetailView
 )
+from .views_celery import celery_health_check
 
 # Health check endpoint
 def health_check(request):
@@ -18,8 +19,10 @@ def health_check(request):
 app_name = 'notifications'
 
 urlpatterns = [
-    # Health check endpoint
+
+    # Health check endpoints
     path('health/', health_check, name='health'),
+    path('celery-health/', celery_health_check, name='celery-health'),
 
     # Core notification endpoints
     path('records/', NotificationListCreateView.as_view(), name='notification-list-create'),

@@ -68,6 +68,10 @@ except Exception as e:
         "
         ;;
     celery-worker)
+        echo "Waiting for Redis to be ready at notifications_redis:6379..."
+        /app/wait-for-it.sh notifications_redis:6379 -t 60 --strict -- echo "Redis is up!"
+        echo "Waiting for Postgres to be ready at notifications_postgres:5432..."
+        /app/wait-for-it.sh notifications_postgres:5432 -t 60 --strict -- echo "Postgres is up!"
         echo "Starting Celery worker..."
         celery -A notification_service worker --loglevel=info
         ;;
