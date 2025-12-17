@@ -64,6 +64,7 @@ class EventConsumer:
             'document.acknowledged': DocumentAcknowledgmentHandler(),
 
             # User Data Change Events
+            'user.account.created': UserAccountCreatedHandler(),
             'user.profile.updated': UserProfileUpdateHandler(),
             'user.account.locked': UserAccountActionHandler(),
             'user.account.unlocked': UserAccountActionHandler(),

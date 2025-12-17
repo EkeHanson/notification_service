@@ -1,0 +1,13 @@
+{% extends "email/base_email.html" %}
+{% block content %}
+  <h2>New Login to Your Account</h2>
+  <p>Hi{{ user_name|default:' there' }},</p>
+  <p>We noticed a new login to your account.</p>
+  <ul>
+    <li><strong>Time:</strong> {{ login_time|default:'Unknown' }}</li>
+    <li><strong>IP Address:</strong> {{ ip_address|default:'Unknown' }}</li>
+    <li><strong>Location:</strong> {{ location|default:'Unknown' }}</li>
+    <li><strong>Device:</strong> {{ device|default:'Unknown' }}</li>
+  </ul>
+  <p>If this was you, no action is needed. If you did not log in, please reset your password immediately or contact support.</p>
+{% endblock %}

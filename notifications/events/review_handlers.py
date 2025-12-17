@@ -33,21 +33,12 @@ class ReviewApprovedHandler(BaseEventHandler):
         }
 
     def _get_email_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        from django.template.loader import render_to_string
+        subject = 'Your Review Has Been Approved'
+        body = render_to_string('email/review_approved.html', context)
         return {
-            'subject': 'Your Review Has Been Approved',
-            'body': '''
-            Hi,
-
-            Your review has been approved and is now visible.
-
-            Rating: {{rating}}/5
-            Comment: {{comment_preview}}
-
-            Thank you for your feedback!
-
-            Best regards,
-            Review Team
-            '''
+            'subject': subject,
+            'body': body
         }
 
     def _get_inapp_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -91,20 +82,12 @@ class ReviewQRScannedHandler(BaseEventHandler):
         }
 
     def _get_email_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        from django.template.loader import render_to_string
+        subject = 'New Review Submitted via QR Code'
+        body = render_to_string('email/review_qr_scanned.html', context)
         return {
-            'subject': 'New Review Submitted via QR Code',
-            'body': '''
-            A new review has been submitted via QR code scan.
-
-            QR ID: {{qr_id}}
-            Rating: {{rating}}/5
-            Reviewer: {{reviewer_email}}
-
-            Please review and approve if appropriate.
-
-            Best regards,
-            Review System
-            '''
+            'subject': subject,
+            'body': body
         }
 
     def _get_inapp_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:

@@ -359,15 +359,6 @@ services:
       - auth_service_default
 
 
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: notifications-mailhog
-    ports:
-      - "1025:1025"  # SMTP server
-      - "8025:8025"  # Web interface
-    networks:
-      - auth_service_default
-    restart: unless-stopped
 
 networks:
   auth_service_default:

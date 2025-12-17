@@ -376,24 +376,12 @@ class LoginSecurityHandler(BaseEventHandler):
                 '''
             }
         else:  # login succeeded
+            from django.template.loader import render_to_string
+            subject = 'New Login to Your Account'
+            body = render_to_string('email/login_success_email.html', context)
             return {
-                'subject': 'New Login to Your Account',
-                'body': '''
-                Hi,
-
-                We noticed a new login to your account.
-
-                Details:
-                - Time: {{login_time}}
-                - IP Address: {{ip_address}}
-                - Location: {{location}}
-                - Device: {{user_agent}}
-
-                If this wasn't you, please secure your account immediately.
-
-                Best regards,
-                The Security Team
-                '''
+                'subject': subject,
+                'body': body
             }
 
     def _get_sms_content(self, event_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
