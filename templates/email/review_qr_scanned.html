@@ -1,11 +1,11 @@
 {% extends 'email/base_email.html' %}
 {% block content %}
-<p>A new review has been submitted via QR code scan.</p>
+<p style="color:#2e7d32;">A new review has been submitted via <span style="color:#ffd600;">QR code scan</span>.</p>
 <ul>
-  <li>QR ID: {{ qr_id }}</li>
-  <li>Rating: {{ rating }}/5</li>
-  <li>Reviewer: {{ reviewer_email }}</li>
+  <li><strong>QR ID:</strong> <span style="color:#42a5f5;">{{ qr_id }}</span></li>
+  <li><strong>Rating:</strong> <span style="color:#ff6f61;">{{ rating }}/5</span></li>
+  <li><strong>Reviewer:</strong> <span style="color:#ffd600;">{{ reviewer_email }}</span></li>
 </ul>
-<p>Please review and approve if appropriate.</p>
-<p>Best regards,<br>Review System</p>
+<p style="color:#42a5f5;">Please review and approve if appropriate.</p>
+<p style="color:#ff6f61;">Best regards,<br><span style="color:#ffd600;">Review System</span></p>
 {% endblock %}

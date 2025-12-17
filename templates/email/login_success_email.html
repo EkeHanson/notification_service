@@ -1,13 +1,13 @@
 {% extends "email/base_email.html" %}
 {% block content %}
-  <h2>New Login to Your Account</h2>
-  <p>Hi{{ user_name|default:' there' }},</p>
-  <p>We noticed a new login to your account.</p>
+  <h2 style="color: #ffd600;">New Login to Your Account</h2>
+  <p style="color: #42a5f5;">Hi <span style="color: #ff6f61;">{{ user_name|default:' there' }}</span>,</p>
+  <p style="color: #2e7d32;">We noticed a new login to your account.</p>
   <ul>
-    <li><strong>Time:</strong> {{ login_time|default:'Unknown' }}</li>
-    <li><strong>IP Address:</strong> {{ ip_address|default:'Unknown' }}</li>
-    <li><strong>Location:</strong> {{ location|default:'Unknown' }}</li>
-    <li><strong>Device:</strong> {{ device|default:'Unknown' }}</li>
+    <li><strong>Time:</strong> <span style="color: #ffd600;">{{ login_time|default:'Unknown' }}</span></li>
+    <li><strong>IP Address:</strong> <span style="color: #42a5f5;">{{ ip_address|default:'Unknown' }}</span></li>
+    <li><strong>Location:</strong> <span style="color: #ff6f61;">{{ location|default:'Unknown' }}</span></li>
+    <li><strong>Device:</strong> <span style="color: #2e7d32;">{{ device|default:'Unknown' }}</span></li>
   </ul>
-  <p>If this was you, no action is needed. If you did not log in, please reset your password immediately or contact support.</p>
+  <p style="color: #42a5f5;">If this was you, no action is needed. If you did not log in, please <a href="#">reset your password</a> immediately or contact support.</p>
 {% endblock %}

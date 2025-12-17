@@ -65,21 +65,21 @@ def update_campaign_completion(self, campaign_id: str, results: list):
 
 @shared_task(bind=True, max_retries=3)
 def send_notification_task(self, record_id: str, channel: str, recipient: str, content: dict, context: dict):
-    record = NotificationRecord.objects.get(id=record_id)
-    record.status = NotificationStatus.RETRYING.value
-    record.save()
-
-    producer = NotificationProducer()
-
+    logger.info(f"[TASK] send_notification_task called with record_id={record_id}, channel={channel}, recipient={recipient}")
     try:
+        record = NotificationRecord.objects.get(id=record_id)
+        logger.info(f"[TASK] Loaded NotificationRecord: id={record.id}, tenant_id={record.tenant_id}, channel={record.channel}, recipient={record.recipient}")
+        record.status = NotificationStatus.RETRYING.value
+        record.save()
+        producer = NotificationProducer()
         creds = validate_tenant_and_channel(record.tenant_id, channel)
+        logger.info(f"[TASK] Got credentials for tenant {record.tenant_id} and channel {channel}")
         # DIAGNOSTIC: log masked credentials and attempt a quick SMTP auth check
         try:
             _pwd = creds.get('password', '') or ''
             _pwd_preview = (_pwd[:6] + '...') if len(_pwd) > 6 else _pwd
             _looks_encrypted = str(_pwd).startswith('gAAAA')
             logger.info(f"🔍 TASK DIAG - creds summary for tenant {record.tenant_id}: smtp_host={creds.get('smtp_host')}, smtp_port={creds.get('smtp_port')}, username={creds.get('username')}, password_preview={_pwd_preview}, password_len={len(_pwd)}, looks_encrypted={_looks_encrypted}")
-
             # Quick SMTP auth probe (no message send) to detect auth failure early
             if creds.get('smtp_host') and creds.get('username'):
                 try:
@@ -92,7 +92,6 @@ def send_notification_task(self, record_id: str, channel: str, recipient: str, c
                     if creds.get('use_tls') and not creds.get('use_ssl'):
                         conn.starttls()
                         conn.ehlo()
-                    # set_debuglevel(0) to avoid verbose output; rely on exceptions
                     conn.set_debuglevel(0)
                     try:
                         conn.login(creds.get('username'), creds.get('password'))
@@ -108,12 +107,13 @@ def send_notification_task(self, record_id: str, channel: str, recipient: str, c
                     logger.warning(f"🔍 TASK DIAG - SMTP connection error for tenant {record.tenant_id}: {e}")
         except Exception as _diag_e:
             logger.warning(f"🔍 TASK DIAG - failed to run SMTP diagnostic: {_diag_e}")
+        logger.info(f"[TASK] Getting handler for channel {channel}")
         handler = Dispatcher.get_handler(channel, record.tenant_id, creds)
-
-        # Use async_to_sync for proper async handling in Celery
+        logger.info(f"[TASK] Handler acquired: {handler}")
         from asgiref.sync import async_to_sync
+        logger.info(f"[TASK] Calling handler.send for recipient={recipient}")
         result = async_to_sync(handler.send)(recipient, content, context, record_id)
-
+        logger.info(f"[TASK] handler.send result: {result}")
         if result['success']:
             record.status = NotificationStatus.SUCCESS.value
             record.provider_response = json.dumps(result['response'])
@@ -141,6 +141,14 @@ def send_notification_task(self, record_id: str, channel: str, recipient: str, c
         record.save()
 
     except Exception as exc:
+        # Fetch record if not already loaded (in case exception occurred before loading)
+        if 'record' not in locals():
+            try:
+                record = NotificationRecord.objects.get(id=record_id)
+            except NotificationRecord.DoesNotExist:
+                logger.error(f"NotificationRecord {record_id} not found")
+                return  # Cannot retry if record doesn't exist
+
         record.retry_count += 1
         if record.retry_count >= record.max_retries:
             record.status = NotificationStatus.FAILED.value

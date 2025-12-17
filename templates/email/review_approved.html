@@ -1,11 +1,11 @@
 {% extends 'email/base_email.html' %}
 {% block content %}
-<p>Hi,</p>
-<p>Your review has been approved and is now visible.</p>
+<p style="color:#42a5f5;">Hi,</p>
+<p style="color:#2e7d32;">Your review has been <span style="color:#ffd600;">approved</span> and is now visible.</p>
 <ul>
-  <li>Rating: {{ rating }}/5</li>
-  <li>Comment: {{ comment_preview }}</li>
+  <li><strong>Rating:</strong> <span style="color:#ff6f61;">{{ rating }}/5</span></li>
+  <li><strong>Comment:</strong> <span style="color:#42a5f5;">{{ comment_preview }}</span></li>
 </ul>
-<p>Thank you for your feedback!</p>
-<p>Best regards,<br>Review Team</p>
+<p style="color:#ff6f61;">Thank you for your feedback!</p>
+<p style="color:#42a5f5;">Best regards,<br><span style="color:#ffd600;">Review Team</span></p>
 {% endblock %}

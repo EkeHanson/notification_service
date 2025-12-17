@@ -1,12 +1,12 @@
 {% extends 'email/base_email.html' %}
 {% block content %}
-<p>Hi {{ user_name }},</p>
-<p>Your profile information has been successfully updated.</p>
+<p style="color:#42a5f5;">Hi <span style="color:#ffd600;">{{ user_name }}</span>,</p>
+<p style="color:#2e7d32;">Your profile information has been <span style="color:#ff6f61;">successfully updated</span>.</p>
 <ul>
-  <li>Updated Fields: {{ updated_fields|join:', ' }}</li>
-  <li>Update Time: {{ update_time }}</li>
-  <li>Updated By: {{ updated_by }}</li>
+  <li><strong>Updated Fields:</strong> <span style="color:#ffd600;">{{ updated_fields|join:', ' }}</span></li>
+  <li><strong>Update Time:</strong> <span style="color:#42a5f5;">{{ update_time }}</span></li>
+  <li><strong>Updated By:</strong> <span style="color:#2e7d32;">{{ updated_by }}</span></li>
 </ul>
-<p>If you did not make these changes, please contact support immediately.</p>
-<p>Best regards,<br>{{ tenant_name }} Team</p>
+<p style="color:#ff6f61;">If you did not make these changes, please contact support immediately.</p>
+<p style="color:#42a5f5;">Best regards,<br><span style="color:#ffd600;">{{ tenant_name }} Team</span></p>
 {% endblock %}

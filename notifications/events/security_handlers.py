@@ -104,7 +104,8 @@ For your security, this code was requested from IP address: {{ip_address}}
 If you didn't request this code, please secure your account immediately by changing your password and contacting our support team.
 
 Best regards,
-The {{tenant_name}} Security Team'''
+The {{tenant_name}} Security Team''',
+                'html_template': 'email/otp_email.html'
             }
         elif event_type == 'auth.2fa.attempt.failed':
             return {

@@ -6,96 +6,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Notification{% endblock %}</title>
-  <style>
-   :root {
-     --primary-color: {{ primary_color|default:'#007bff' }};
-     --secondary-color: {{ secondary_color|default:'#6c757d' }};
-   }
-   body {
-     background: #f4f4f4;
-     margin: 0;
-     padding: 0;
-     font-family: 'Segoe UI', Arial, sans-serif;
-     color: #222;
-   }
-    .email-card {
-      max-width: 520px;
-      margin: 40px auto;
-      background: #fff;
-      border-radius: 14px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.09);
-      overflow: hidden;
-      border: 1px solid #e3e8ee;
-    }
-    .email-content {
-      padding: 36px 32px 32px 32px;
-      font-size: 16px;
-      line-height: 1.7;
-    }
-    .email-header {
-      background: linear-gradient(90deg, var(--primary-color), var(--secondary-color) 90%);
-      color: #fff;
-      padding: 32px 32px 18px 32px;
-      text-align: center;
-    }
-    .email-header img {
-      max-width: 80px;
-      margin-bottom: 12px;
-      border-radius: 8px;
-      background: #fff;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    }
-    .email-header h1 {
-      margin: 0 0 6px 0;
-      font-size: 26px;
-      letter-spacing: 1px;
-      font-weight: 700;
-    }
-    .email-header h2 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 400;
-      opacity: 0.95;
-    }
-    .email-content {
-      padding: 36px 32px 32px 32px;
-      font-size: 16px;
-      line-height: 1.7;
-    }
-    .email-footer {
-      background: #f7f9fa;
-      border-top: 1px solid #e3e8ee;
-      color: #7a869a;
-      font-size: 13px;
-      text-align: center;
-      padding: 18px 32px;
-    }
-    @media (max-width: 600px) {
-      .email-card, .email-content, .email-header, .email-footer {
-        padding-left: 12px !important;
-        padding-right: 12px !important;
-      }
-      .email-card {
-        margin: 10px;
-      }
-    }
-  </style>
+  <!-- Styles moved to inline for email compatibility -->
   {% block head_extra %}{% endblock %}
 </head>
-<body>
-  <div class="email-card">
-    <div class="email-header">
+<body style="background: #f5f5f5; margin: 0; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; color: #333;">
+  <div style="max-width: 540px; margin: 40px auto; background: #fff; border-radius: 18px; box-shadow: 0 6px 32px rgba(255,111,97,0.13), 0 1.5px 8px rgba(66,165,245,0.09); overflow: hidden; border: 2.5px solid #ffd600; position: relative;">
+    <div style="background: linear-gradient(135deg, #ff6f61 0%, #42a5f5 100%); color: #fff; padding: 36px 36px 20px 36px; text-align: center; border-radius: 18px 18px 0 0; box-shadow: 0 2px 12px rgba(255,214,0,0.08);">
       {% if tenant_logo %}
-        <img src="{{ tenant_logo }}" alt="{{ tenant_name }} Logo" />
+        <img src="{{ tenant_logo }}" alt="{{ tenant_name }} Logo" style="max-width: 90px; margin-bottom: 14px; border-radius: 10px; background: #fff; box-shadow: 0 2px 12px rgba(255,214,0,0.10);" />
       {% endif %}
-      <h1>{{ tenant_name }}</h1>
-      <h2>{% block header_subtitle %}{% endblock %}</h2>
+      <h1 style="margin: 0 0 8px 0; font-size: 30px; letter-spacing: 1.5px; font-weight: 800; text-shadow: 1px 2px 8px rgba(66,165,245,0.13); color: #ffd600;">{{ tenant_name }}</h1>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 500; opacity: 0.98; color: #42a5f5;">{% block header_subtitle %}{% endblock %}</h2>
     </div>
-    <div class="email-content">
+    <div style="padding: 38px 36px 34px 36px; font-size: 17px; line-height: 1.8; background: #f5f5f5; border-radius: 0 0 18px 18px; color: #333;">
       {% block content %}{% endblock %}
     </div>
-    <div class="email-footer">
-      {% block footer %}If you have questions, contact <a href="mailto:support@proliance.com" style="color:var(--primary-color);text-decoration:none;">support@proliance.com</a>.{% endblock %}
+    <div style="background: linear-gradient(90deg, #ffd600 0%, #42a5f5 100%); border-top: 2px solid #ff6f61; color: #fff; font-size: 14px; text-align: center; padding: 20px 36px; border-radius: 0 0 18px 18px; font-weight: 500; letter-spacing: 0.5px; box-shadow: 0 -2px 8px rgba(255,111,97,0.07);">
+      {% block footer %}If you have questions, contact <a href="mailto:support@proliance.com" style="color:#ff6f61;text-decoration:none;">support@proliance.com</a>.{% endblock %}
     </div>
   </div>
 </body>

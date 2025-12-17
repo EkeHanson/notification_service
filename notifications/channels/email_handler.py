@@ -35,7 +35,7 @@ class EmailHandler(BaseHandler):
     async def send(self, recipient: str, content: dict, context: dict, record_id: str = None) -> dict:
         from django.core.mail import get_connection
         try:
-            branding = self._get_tenant_branding(context)
+            # Tenant branding details are already included in the event payload context
             logger.info(f"Content before rendering: {content}")
             logger.info(f"Context before rendering: {context}")
             rendered_content = self._render_content(content, context)
@@ -46,15 +46,10 @@ class EmailHandler(BaseHandler):
             logger.info(f"Code value in context: {context.get('code', 'NOT_FOUND')}")
             logger.info(f"Body template before rendering: {content.get('body', '')[:100]}...")
             logger.info(f"Body after rendering: {body_text[:100]}...")
-            context.update({
-                'tenant_name': branding['name'],
-                'tenant_logo': branding['logo_url'],
-                'primary_color': branding['primary_color'],
-                'secondary_color': branding['secondary_color'],
-                'company_name': branding['name'],
-                'logo_url': branding['logo_url']
-            })
+            # Ensure company_name is set for templates
+            context.setdefault('company_name', context.get('tenant_name', 'Company'))
             html_body = self._render_html_template(content, context)
+            logger.info(f"[DEBUG] Rendered HTML body (first 500 chars): {html_body[:500]}")
             creds = self.credentials
             _pwd = creds.get('password', '') or ''
             _pwd_preview = (_pwd[:6] + '...') if len(_pwd) > 6 else _pwd

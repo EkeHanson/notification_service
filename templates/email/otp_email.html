@@ -1,116 +1,38 @@
 
 {% extends "email/base_email.html" %}
 {% block title %}Your One-Time Passcode (OTP){% endblock %}
-{% block head_extra %}
-<style>
-  .otp-container {
-    background: #f9fafb;
-    border-radius: 12px;
-    max-width: 480px;
-    margin: 32px auto;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-    padding: 32px 24px 24px 24px;
-    font-family: 'Segoe UI', Arial, sans-serif;
-  }
-  .otp-title {
-    color: #1a237e;
-    font-size: 22px;
-    font-weight: 700;
-    margin-bottom: 8px;
-    text-align: center;
-  }
-  .otp-brand {
-    color: #1976d2;
-    font-size: 16px;
-    font-weight: 500;
-    text-align: center;
-    margin-bottom: 18px;
-  }
-  .otp-code-box {
-    background: #fff;
-    border: 2.5px dashed #1976d2;
-    border-radius: 8px;
-    padding: 22px 0 14px 0;
-    margin: 0 auto 18px auto;
-    text-align: center;
-    width: 80%;
-    box-shadow: 0 1px 4px rgba(25,118,210,0.07);
-  }
-  .otp-code {
-    font-size: 38px;
-    font-weight: bold;
-    color: #1976d2;
-    letter-spacing: 8px;
-    font-family: 'Consolas', monospace;
-    margin-bottom: 6px;
-  }
-  .otp-expiry {
-    font-size: 14px;
-    color: #e65100;
-    margin-bottom: 0;
-    text-align: center;
-  }
-  .otp-user-details {
-    background: #e3f2fd;
-    border-radius: 7px;
-    padding: 12px 16px;
-    margin: 18px 0 0 0;
-    font-size: 15px;
-    color: #263238;
-    line-height: 1.7;
-  }
-  .otp-user-details strong {
-    color: #1976d2;
-  }
-  .otp-instructions {
-    background: #fffde7;
-    border-radius: 7px;
-    padding: 12px 16px;
-    margin: 18px 0 0 0;
-    font-size: 15px;
-    color: #6d4c41;
-  }
-  .otp-footer {
-    margin-top: 28px;
-    font-size: 13px;
-    color: #888;
-    text-align: center;
-  }
-</style>
-{% endblock %}
+{% block head_extra %}<!-- Inline styles for email compatibility -->{% endblock %}
 {% block content %}
-<div class="otp-container">
-  <div class="otp-title">Your One-Time Passcode</div>
-  <div class="otp-brand">{{ tenant_name|default:"Your Organization" }}</div>
-  <div class="otp-code-box">
-    <div class="otp-code">{{ code|default:"------" }}</div>
-    <div class="otp-expiry">Expires in {{ expires_in_seconds|default:"--" }} seconds</div>
+<div style="background: #f5f5f5; border-radius: 16px; max-width: 500px; margin: 36px auto; box-shadow: 0 4px 24px rgba(255,111,97,0.13), 0 1.5px 8px rgba(66,165,245,0.09); padding: 36px 28px 28px 28px; font-family: 'Segoe UI', Arial, sans-serif; border: 2.5px solid #ff6f61; position: relative;">
+  <div style="color: #ff6f61; font-size: 26px; font-weight: 800; margin-bottom: 10px; text-align: center; letter-spacing: 1px; text-shadow: 1px 2px 8px rgba(255,214,0,0.13);">Your One-Time Passcode</div>
+  <div style="color: #42a5f5; font-size: 18px; font-weight: 600; text-align: center; margin-bottom: 20px; letter-spacing: 0.5px;">{{ tenant_name|default:"Your Organization" }}</div>
+  <div style="background: #ffffff; border: 3px solid #42a5f5; border-radius: 10px; padding: 26px 0 16px 0; margin: 0 auto 22px auto; text-align: center; width: 85%; box-shadow: 0 4px 16px rgba(66,165,245,0.20);">
+    <div style="font-size: 48px; font-weight: bold; color: #ff6f61; letter-spacing: 12px; font-family: 'Consolas', monospace; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(255,111,97,0.3);">{{ code|default:"------" }}</div>
+    <div style="font-size: 15px; color: #ff6f61; margin-bottom: 0; text-align: center; font-weight: 600;">
+      {% if expires_in_seconds %}
+        Expires in {{ expires_in_seconds }} seconds
+      {% elif expires_at %}
+        Expires at {{ expires_at }}
+      {% else %}
+        Expires soon
+      {% endif %}
+    </div>
   </div>
-  <div class="otp-user-details">
-    <strong>User Details:</strong><br>
-    {% if user_first_name or user_last_name %}
-      Name: {{ user_first_name|default:"" }} {{ user_last_name|default:"" }}<br>
-    {% endif %}
-    {% if user_id %}
-      User ID: {{ user_id }}<br>
-    {% endif %}
-    {% if email %}
-      Email: {{ email }}<br>
-    {% endif %}
-    {% if ip_address %}
-      IP: {{ ip_address }}<br>
-    {% endif %}
-    {% if user_agent %}
-      User Agent: {{ user_agent }}<br>
-    {% endif %}
+  <div style="background: #d0d0d0; border-radius: 9px; padding: 14px 18px; margin: 20px 0 0 0; font-size: 16px; color: #4a90e2; line-height: 1.8; border: 1.5px solid #42a5f5;">
+    <strong style="color: #ff6f61;">User Details:</strong><br>
+    <span style="color: #333;">Name: {{ user_first_name|default:"N/A" }} {{ user_last_name|default:"" }}<br>
+    User ID: {{ user_id|default:"N/A" }}<br>
+    Email: {{ email|default:"N/A" }}<br>
+    IP Address: {{ ip_address|default:"N/A" }}<br>
+    User Agent: {{ user_agent|default:"N/A" }}</span><br>
   </div>
-  <div class="otp-instructions">
-    <strong>How to use your code:</strong><br>
-    1. Copy the code above.<br>
+  <div style="background: #d0d0d0; border-radius: 9px; padding: 14px 18px; margin: 20px 0 0 0; font-size: 16px; color: #42a5f5; border: 1.5px solid #ffd600;">
+    <strong style="color: #ff6f61;">How to use your code:</strong><br>
+    <span style="color: #333;">1. Copy the code above.<br>
     2. Return to the login page.<br>
-    3. Paste or enter the code to complete your login.<br>
+    3. Paste or enter the code to complete your login.</span><br>
   </div>
-  <div class="otp-footer">
+  <div style="margin-top: 32px; font-size: 14px; color: #42a5f5; text-align: center; font-weight: 600;">
     If you did not request this code, you can safely ignore this email.<br>
     &copy; {{ tenant_name|default:"Your Organization" }}
   </div>

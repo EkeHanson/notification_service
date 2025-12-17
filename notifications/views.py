@@ -144,9 +144,10 @@ class DeviceTokenListCreateView(generics.ListCreateAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        tenant_id = self.request.tenant_id
-        user_id = self.request.user_id
-        return DeviceToken.objects.filter(tenant_id=tenant_id, user_id=user_id)
+           tenant_id = self.request.tenant_id
+           user = self.request.user
+           user_id = getattr(user, "id", None)
+           return DeviceToken.objects.filter(tenant_id=tenant_id, user_id=user_id)
 
     def perform_create(self, serializer):
         # Handle token updates (deactivate old tokens for same device)
@@ -165,9 +166,10 @@ class DeviceTokenDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = DeviceTokenSerializer
 
     def get_queryset(self):
-        tenant_id = self.request.tenant_id
-        user_id = self.request.user_id
-        return DeviceToken.objects.filter(tenant_id=tenant_id, user_id=user_id)
+           tenant_id = self.request.tenant_id
+           user = self.request.user
+           user_id = getattr(user, "id", None)
+           return DeviceToken.objects.filter(tenant_id=tenant_id, user_id=user_id)
 
 
 # Push Analytics Views
@@ -324,15 +326,16 @@ class ChatConversationListCreateView(generics.ListCreateAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        tenant_id = self.request.tenant_id
-        user_id = self.request.user_id
-        # Return conversations where user is a participant
-        return ChatConversation.objects.filter(
-            tenant_id=tenant_id,
-            participants__user_id=user_id,
-            participants__is_active=True,
-            is_active=True
-        ).distinct()
+            tenant_id = self.request.tenant_id
+            user = self.request.user
+            user_id = getattr(user, "id", None)
+            # Return conversations where user is a participant
+            return ChatConversation.objects.filter(
+                tenant_id=tenant_id,
+                participants__user_id=user_id,
+                participants__is_active=True,
+                is_active=True
+            ).distinct()
 
     def create(self, request, *args, **kwargs):
         tenant_id = request.tenant_id
@@ -362,7 +365,8 @@ class ChatConversationListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         conversation = serializer.save()
         tenant_id = self.request.tenant_id
-        user_id = self.request.user_id
+        user = self.request.user
+        user_id = getattr(user, "id", None)
         target_user_id = self.request.data.get('target_user_id')
 
         # Add creator as participant
@@ -387,12 +391,13 @@ class ChatConversationDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ChatConversationSerializer
 
     def get_queryset(self):
-        tenant_id = self.request.tenant_id
-        user_id = self.request.user_id
-        return ChatConversation.objects.filter(
-            tenant_id=tenant_id,
-            participants__user_id=user_id,
-            participants__is_active=True
+            tenant_id = self.request.tenant_id
+            user = self.request.user
+            user_id = getattr(user, "id", None)
+            return ChatConversation.objects.filter(
+                tenant_id=tenant_id,
+                participants__user_id=user_id,
+                participants__is_active=True
         ).distinct()
 
 
@@ -422,7 +427,8 @@ class ChatMessageListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         tenant_id = self.request.tenant_id
         conversation_id = self.kwargs['conversation_id']
-        user_id = self.request.user_id
+        user = self.request.user
+        user_id = getattr(user, "id", None)
 
         # Ensure user is participant in conversation
         if not ChatParticipant.objects.filter(
@@ -457,17 +463,18 @@ class ChatMessageDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ChatMessageSerializer
 
     def get_queryset(self):
-        tenant_id = self.request.tenant_id
-        conversation_id = self.kwargs['conversation_id']
-        user_id = self.request.user_id
+            tenant_id = self.request.tenant_id
+            conversation_id = self.kwargs['conversation_id']
+            user = self.request.user
+            user_id = getattr(user, "id", None)
 
-        # Ensure user is participant and message belongs to conversation
-        return ChatMessage.objects.filter(
-            tenant_id=tenant_id,
-            conversation_id=conversation_id,
-            conversation__participants__user_id=user_id,
-            conversation__participants__is_active=True
-        ).distinct()
+            # Ensure user is participant and message belongs to conversation
+            return ChatMessage.objects.filter(
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                conversation__participants__user_id=user_id,
+                conversation__participants__is_active=True
+            ).distinct()
 
 
 class MessageReactionListCreateView(generics.ListCreateAPIView):
@@ -501,15 +508,16 @@ class UserPresenceDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = UserPresenceSerializer
 
     def get_object(self):
-        tenant_id = self.request.tenant_id
-        user_id = self.request.user_id
+            tenant_id = self.request.tenant_id
+            user = self.request.user
+            user_id = getattr(user, "id", None)
 
-        obj, created = UserPresence.objects.get_or_create(
-            tenant_id=tenant_id,
-            user_id=user_id,
-            defaults={'status': 'online'}
-        )
-        return obj
+            obj, created = UserPresence.objects.get_or_create(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                defaults={'status': 'online'}
+            )
+            return obj
 
 
 class FileUploadView(APIView):
